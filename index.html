@@ -247,7 +247,7 @@
   }
   .memo-title .arr { margin-left: auto; transition: transform 0.2s; }
   .memo-title.open .arr { transform: rotate(180deg); }
-  .memo-body { padding: 16px; display: none; font-size: 13px; color: var(--text); line-height: 1.8; }
+  .memo-body { padding: 16px; display: block; font-size: 13px; color: var(--text); line-height: 1.8; }
   .memo-body.show { display: block; }
   .memo-body h3 {
     font-family: 'Barlow Condensed', sans-serif;
@@ -656,11 +656,11 @@
     <button class="btn-reset-stats" onclick="resetStats()">🗑 Réinitialiser la progression</button>
 
     <div class="memo-section">
-      <div class="memo-title" onclick="toggleMemo(this)">
+      <div class="memo-title open" onclick="toggleMemo(this)">
         📋 Aide-mémoire réglementation
         <span class="arr">▼</span>
       </div>
-      <div class="memo-body">
+      <div class="memo-body show">
         <h3>Durées de conduite</h3>
         <ul>
           <li>Continue : <span>4h30</span> (nuit : <span>4h</span>)</li>
@@ -1767,9 +1767,13 @@ function normalizeUnits(s) {
   return s
     // Virgule → point dans les nombres décimaux
     .replace(/(\d),(\d)/g, '$1.$2')
-    // Supprimer les zéros finaux inutiles : 13.50 → 13.5, 18.750 → 18.75, 2.00 → 2
+    // Supprimer les zéros finaux inutiles : 13.50 → 13.5, 18.750 → 18.75
     .replace(/(\d+)\.(\d*?)0+(?!\d)/g, (m, int, dec) => dec ? int + '.' + dec : int)
-    // Supprimer les espaces entre nombre et unité
+    // Temps composé type "4h30" / "4 h 30" / "4h 30" / "4 h30" → tout → "4h30"
+    .replace(/(\d+)\s*h(?:eures?)?\s*(\d+)\s*(?:mn|min|minutes?)?/gi, '$1h$2')
+    // "X heures puis Y heures" ou "Xh + Yh" → "Xh yh"
+    .replace(/(\d+)\s*h(?:eures?)?\s*(?:puis|et|\+)\s*(\d+)\s*h(?:eures?)?/gi, '$1h $2h')
+    // Unités de distance
     .replace(/(\d+(?:\.\d+)?)\s*(km\/h|km\/h|km|m\/s)/gi, '$1$2')
     .replace(/(\d+(?:\.\d+)?)\s*(metres?|mètres?|meter?|m)\b/gi, '$1m')
     .replace(/(\d+(?:\.\d+)?)\s*(kilometres?|kilomètres?|km)\b/gi, '$1km')
@@ -1778,10 +1782,12 @@ function normalizeUnits(s) {
     .replace(/(\d+(?:\.\d+)?)\s*(grammes?|g)\b/gi, '$1g')
     // Temps : min / minute(s) / mn → tout → "min"
     .replace(/(\d+(?:\.\d+)?)\s*(minutes?|mins?|mn)\b/gi, '$1min')
-    // heures / h → tout → "h"
-    .replace(/(\d+(?:\.\d+)?)\s*(heures?|hrs?|h)\b/gi, '$1h')
+    // heures simples (pas déjà traitées) → "h"
+    .replace(/(\d+(?:\.\d+)?)\s*(heures?|hrs?)\b/gi, '$1h')
+    // "h" isolé collé ou séparé du nombre (ex: "9 h" → "9h")
+    .replace(/(\d+)\s+h\b/g, '$1h')
     // secondes → "s"
-    .replace(/(\d+(?:\.\d+)?)\s*(secondes?|secs?|s)\b/gi, '$1s')
+    .replace(/(\d+(?:\.\d+)?)\s*(secondes?|secs?)\b/gi, '$1s')
     // ans / an → "an"
     .replace(/(\d+)\s*(années?|ans?)\b/gi, '$1an')
     // jours → "jour"
@@ -2078,18 +2084,64 @@ const ORAL_FICHES = [
   {
     id: 'oral_f2',
     num: 'FICHE 2',
-    title: 'Route de nuit',
+    title: 'Comportement en cas d\'accident',
     sections: [
-      { title: '1 : DANGERS', subsections: [
-        { name: '', bullets: ['Éblouissement par les phares des véhicules venant en sens inverse','Mauvaise appréciation des distances et des vitesses','Fatigue et endormissement plus importants','Animaux sur la chaussée','Piétons et cyclistes moins visibles'] }
+      { title: '1 : GESTES D\'URGENCE', subsections: [
+        { name: 'En arrivant le premier sur un accident, il faut appliquer le P.A.S : Protéger – Alerter – Secourir', bullets: [] },
+        { name: 'PROTÉGER :', bullets: [
+          'Signaler les lieux de l\'accident pour éviter le suraccident',
+          'Utiliser un gilet haute visibilité, le triangle de présignalisation et les feux de détresse',
+          'Éclairer l\'accident la nuit (feux de route)'
+        ]},
+        { name: 'ALERTER :', bullets: [
+          'Borne d\'appel sur autoroute',
+          'Numéros utiles : 15 : Samu / 17 : Police ou Gendarmerie / 18 : Pompiers / 112 : numéro d\'urgence européen',
+          'E-call à bord des véhicules',
+          'Informations à communiquer : le lieu de l\'accident / le nombre et type de véhicules (voiture, poids-lourd, autocar…) / le nombre de blessés et leur état (conscient/inconscient…) / risques particuliers (transport matières dangereuses, risque électrique…)'
+        ]},
+        { name: 'SECOURIR :', bullets: [
+          'Couvrir les blessés (couverture de survie, manteau…)',
+          'Parler aux blessés et les rassurer',
+          'Ne pas intervenir sans compétence'
+        ]},
+        { name: '', bullets: ['PORTER SECOUR EN 1ER SI RISQUES D\'INCENDIE OU NOYADE (sans se mettre soi-même en danger)'] }
       ]},
-      { title: '2 : PRÉCAUTIONS', subsections: [
-        { name: 'Éclairage :', bullets: ['Allumer les feux de croisement (phares code)','Passer aux feux de route (pleins phares) dès que possible','Repasser en feux de croisement lors du croisement d\'un véhicule ou d\'un piéton','Vérifier l\'état et le réglage des phares'] },
-        { name: 'Vitesse et distance :', bullets: ['Réduire la vitesse — adapter sa vitesse à la portée des phares','Augmenter les distances de sécurité','Ne pas conduire si somnolence : s\'arrêter et se reposer'] },
-        { name: 'Vigilance :', bullets: ['Rester attentif aux piétons, cyclistes, animaux','Surveiller les bords de la route','S\'arrêter régulièrement pour se reposer (toutes les 2h environ)'] }
+      { title: '2 : GESTES DANGEREUX', subsections: [
+        { name: '', bullets: [
+          'Ne pas donner à boire à un blessé',
+          'Ne pas déplacer un blessé sauf risque d\'incendie ou de noyade',
+          'Ne pas enlever le casque d\'un motard',
+          'Ne pas effectuer des gestes non maîtrisés'
+        ]}
       ]},
-      { title: '3 : ÉBLOUISSEMENT', subsections: [
-        { name: 'En cas d\'éblouissement :', bullets: ['Réduire la vitesse','Regarder le bord droit de la chaussée (ligne blanche)','Ne pas regarder directement les phares adverses','S\'arrêter si nécessaire'] }
+      { title: '3 : CONDUITE À TENIR (accident matériel)', subsections: [
+        { name: '', bullets: [
+          'Remplir un constat amiable d\'accident (pas obligatoire)',
+          'Si pas de constat : application « e-constat » ou feuille vierge',
+          'Le constat peut s\'utiliser dans tous les pays Européens',
+          'Prévenir son entreprise (si déplacement professionnel)',
+          'Rester calme et courtois',
+          'Dégager les véhicules lourds (si possible) pour ne pas encombrer les lieux'
+        ]},
+        { name: 'Remplissage d\'un constat (côté recto) :', bullets: [
+          'Indiquer la date, l\'heure et le lieu de l\'accident',
+          'Indiquer les informations : sur les conducteurs (identité…) / sur les véhicules (immatriculation, dégâts…) / sur les assureurs (coordonnées)',
+          'Faire un schéma et préciser les circonstances',
+          'Signature des 2 conducteurs'
+        ]},
+        { name: '', bullets: [
+          'Chaque partie prend un exemplaire — Le recto ne peut plus être modifié (verso à remplir chez soi)',
+          'Constat à envoyer sous 5 jours ouvrés (2 jours si vol / incendie)'
+        ]}
+      ]},
+      { title: '4 : PARTICULARITÉS DES VÉHICULES AFFECTÉS AUX TRANSPORT DE PERSONNES', subsections: [
+        { name: '', bullets: [
+          'Connaître et retenir l\'emplacement des extincteurs, de la boîte de secours, de la lampe et des marteaux pics',
+          'Garder son calme',
+          'Arrêter le moteur / allumer les feux de détresse / actionner le coupe-circuit',
+          'Hors agglomération = Évacuation des personnes (regroupement et mise en sécurité)',
+          'En agglomération = Ne pas évacuer (sauf incendie)'
+        ]}
       ]}
     ]
   },
@@ -2124,19 +2176,22 @@ const ORAL_FICHES = [
   {
     id: 'oral_f4',
     num: 'FICHE 4',
-    title: 'Distances de sécurité et freinage',
+    title: 'Gestes et postures – Accident du travail',
     sections: [
-      { title: '1 : DISTANCE DE SÉCURITÉ', subsections: [
-        { name: 'Définition :', bullets: ['Distance minimale à respecter entre deux véhicules en circulation','Permet d\'éviter une collision en cas de freinage brutal du véhicule devant'] },
-        { name: 'Règle :', bullets: ['En agglomération : distance de 2 secondes minimum','Hors agglomération : distance de 2 secondes minimum (recommandé 3 secondes)','Par mauvais temps : doubler la distance','Sur autoroute : marquage au sol tous les 50m (2 traits = 1 unité de distance)'] }
+      { title: '1 : GESTES ET POSTURE À ADOPTER', subsections: [
+        { name: 'Bonne installation au poste de conduite :', bullets: ['Réglage du siège','Port de la ceinture de sécurité'] },
+        { name: 'Montée et descente de l\'autocar :', bullets: ['Ne pas sauter','Se tenir en descendant','Attention aux marches glissantes'] },
+        { name: 'Chargement / déchargement des marchandises et des bagages :', bullets: ['Garder le dos droit et plier les genoux','Pour les charges lourdes, se faire aider'] }
       ]},
-      { title: '2 : DISTANCES DE FREINAGE', subsections: [
-        { name: 'Distance de réaction :', bullets: ['Temps entre la perception du danger et l\'action sur la pédale de frein','Environ 1 seconde (varie selon la fatigue, l\'alcool, les médicaments…)','À 90 km/h : environ 25 mètres parcourus pendant la réaction'] },
-        { name: 'Distance de freinage :', bullets: ['Distance parcourue entre le début du freinage et l\'arrêt complet','Dépend de la vitesse (si vitesse double → distance de freinage × 4)','Dépend de l\'état de la route (adhérence)','Dépend du poids du véhicule (véhicule lourd = freinage plus long)','Dépend de l\'état des freins et des pneus'] },
-        { name: 'Distance d\'arrêt totale :', bullets: ['Distance de réaction + Distance de freinage','À 90 km/h : environ 80 à 100 mètres pour un véhicule lourd'] }
+      { title: '2 : IMPORTANCE DES ACCIDENTS', subsections: [
+        { name: 'ACCIDENT DU TRAVAIL (DÉFINITION) :', bullets: ['C\'est un accident qui survient durant le temps de travail (à l\'arrêt ou en circulation)','Durant le trajet « domicile/travail » ou « travail/domicile »'] },
+        { name: 'CHIFFRES DES ACCIDENTS DANS LE TRANSPORT ROUTIER DE VOYAGEURS (2021) :', bullets: ['Environ 100 000 conducteurs salariés dans le transport routier de voyageurs','2243 accidents du travail et 4 morts','Accidents de la route : 15 tués et 178 blessés dont 85 occupants d\'autocars'] }
       ]},
-      { title: '3 : FACTEURS QUI AUGMENTENT LA DISTANCE DE FREINAGE', subsections: [
-        { name: '', bullets: ['La vitesse (effet le plus important)','La fatigue et l\'alcool (augmentent la distance de réaction)','Le mauvais état de la route (pluie, verglas, graviers)','Le surpoids / surcharge du véhicule','L\'usure des freins et des pneus','La descente (énergie cinétique plus importante)'] }
+      { title: '3 : DANGERS ET RISQUES', subsections: [
+        { name: 'Il y a 13 fois plus d\'accidents du travail lorsque le véhicule est à l\'arrêt qu\'en circulation', bullets: [] },
+        { name: 'Montée ou descente de l\'autocar / nettoyage du véhicule :', bullets: ['Risques de chutes avec foulures, entorses ou fractures'] },
+        { name: 'Utilisation de la soute :', bullets: ['Écrasement des doigts (ouverture/fermeture)'] },
+        { name: 'Manutention manuelle (chargement / déchargement des bagages) :', bullets: ['Mal de dos, hernie…','Écrasement des mains/pieds suite à la chute d\'un bagage'] }
       ]}
     ]
   },
@@ -2150,13 +2205,12 @@ const ORAL_FICHES = [
         { name: 'Risques :', bullets: ['Si chargement défectueux : déséquilibre / renversement / ballant / déport au freinage','Si pas ou mauvais arrimage : chute du chargement dans la soute = chargement abîmé','Non-respect des poids : amende / refus de garantie des assurances','Le conducteur est responsable de son chargement'] }
       ]},
       { title: '2 : SURCHARGE', subsections: [
-        { name: '', bullets: ['Surcharge = non-respect du PTAC / PTRA ou de la charge à l\'essieu','Toute surcharge est interdite','Le PTAC et le PTRA sont indiqués sur la plaque de tare et de surface et sur le certificat d\'immatriculation','La charge maximale à l\'essieu est indiquée sur la plaque constructeur'] }
+        { name: 'Surcharge = non-respect du PTAC / PTRA ou de la charge à l\'essieu — Toute surcharge est interdite', bullets: [] },
+        { name: '', bullets: ['Le PTAC et le PTRA sont indiqués sur la plaque de tare et de surface et sur le certificat d\'immatriculation','La charge maximale à l\'essieu est indiquée sur la plaque constructeur'] },
+        { name: 'Les poids ne sont pas toujours respectés pour des questions de :', bullets: ['Rentabilité (gains d\'argent car plus de marchandises dans les véhicules)','Difficulté de connaître le poids exact de l\'autocar sans balance (passagers + chargement)'] }
       ]},
       { title: '3 : SANCTIONS', subsections: [
         { name: '', bullets: ['Amende forfaitaire de 4ème classe (135€)','Immobilisation du véhicule et déchargement du surplus si dépassement supérieur à 5% du poids maximal autorisé','Non prise en charge des assurances en cas d\'accident','Prison'] }
-      ]},
-      { title: '4 : DANGERS ET RISQUES (arrêt du véhicule)', subsections: [
-        { name: '', bullets: ['Il y a 13 fois plus d\'accidents du travail lorsque le véhicule est à l\'arrêt qu\'en circulation','Montée ou descente de l\'autocar / nettoyage : risques de chutes avec foulures, entorses ou fractures','Utilisation de la soute : écrasement des doigts (ouverture/fermeture)','Manutention manuelle (chargement/déchargement) : mal de dos, hernie, écrasement des mains/pieds'] }
       ]}
     ]
   },
@@ -2183,18 +2237,29 @@ const ORAL_FICHES = [
     num: 'FICHE 7',
     title: 'Dynamique du véhicule',
     sections: [
+      { title: 'Accident mortel impliquant un véhicule lourd (2019)', subsections: [
+        { name: 'Usagers de PL :', bullets: ['56 morts'] },
+        { name: 'Autres usagers :', bullets: ['536 morts'] }
+      ]},
       { title: '1 : VITESSE (énergie cinétique)', subsections: [
-        { name: '', bullets: ['La vitesse est l\'une des principales causes d\'accidents de la route (30% des accidents mortels)','L\'énergie cinétique est la force d\'un véhicule en mouvement','Elle varie selon le poids du véhicule et la vitesse','En cas de choc, un véhicule lourd fera plus de dégâts','La distance de freinage est plus longue'] }
+        { name: 'La vitesse est l\'une des principales causes d\'accidents de la route (30% des accidents mortels)', bullets: [] },
+        { name: 'L\'énergie cinétique est la force d\'un véhicule en mouvement :', bullets: ['Elle varie selon le poids du véhicule et la vitesse','Par exemple, un véhicule de 19t roulant à 90 km/h accumulera plus d\'énergie cinétique qu\'une voiture de 1t à 90 km/h'] },
+        { name: 'Conséquences :', bullets: ['En cas de choc, un véhicule lourd fera plus de dégâts','La distance de freinage est plus longue'] }
       ]},
       { title: '2 : CENTRE DE GRAVITÉ', subsections: [
-        { name: '', bullets: ['C\'est le point d\'équilibre des masses d\'un véhicule, déterminé à la construction','Plus le centre de gravité est bas, plus le véhicule est stable','Le centre de gravité dépend de la hauteur du véhicule (car à double étage) et de la hauteur et répartition du chargement','Conséquences : le ballant (balancement) / le renversement de l\'autocar'] }
+        { name: 'C\'est le point d\'équilibre des masses d\'un véhicule, déterminé à la construction :', bullets: ['Plus le centre de gravité est bas, plus le véhicule est stable'] },
+        { name: 'Le centre de gravité dépend :', bullets: ['De la hauteur du véhicule (car à double étage)','De la hauteur et de la répartition du chargement'] },
+        { name: 'Les conséquences :', bullets: ['Le ballant (balancement) / le renversement de l\'autocar'] }
       ]},
       { title: '3 : FORCE CENTRIFUGE', subsections: [
-        { name: '', bullets: ['C\'est la force qui pousse le véhicule vers l\'extérieur d\'un virage ou d\'un giratoire','Elle varie avec la vitesse / le poids (masse) / le rayon du virage','Risques : perte de la trajectoire et sortie de route','Renversement dans les virages serrés et les giratoires (risques plus importants si le centre de gravité est haut)'] }
+        { name: 'C\'est la force qui pousse le véhicule vers l\'extérieur d\'un virage ou d\'un giratoire', bullets: [] },
+        { name: 'Elle varie avec :', bullets: ['La vitesse / le poids (masse) / le rayon du virage'] },
+        { name: 'Les risques :', bullets: ['Perte de la trajectoire et sortie de route','Renversement dans les virages serrés et les giratoires (risques plus importants si le centre de gravité est haut)'] }
       ]},
       { title: '4 : ADAPTATION DE LA CONDUITE', subsections: [
-        { name: 'On adapte la vitesse en fonction de :', bullets: ['La signalisation (panneaux…)','Des disques de limitation de vitesse sur mon véhicule (80/90 ou 60/80/90)','De l\'état de la route (trous, chaussée glissante…)','De la visibilité (brouillard…)','De l\'éclairage (nuit…)','De mon chargement'] },
-        { name: '', bullets: ['Avoir une conduite souple et anticiper les ralentissements','Répartir, équilibrer et arrimer le chargement'] }
+        { name: 'On adapte la vitesse en fonction :', bullets: ['De la signalisation (panneaux…)','Des disques de limitation de vitesse sur mon véhicule (80/90 ou 60/80/90)','De l\'état de la route (trous, chaussée glissante…)','De la visibilité (brouillard…)','De l\'éclairage (nuit…)','De mon chargement'] },
+        { name: 'Avoir une conduite souple et anticiper les ralentissements', bullets: [] },
+        { name: 'Répartir, équilibrer et arrimer le chargement', bullets: [] }
       ]}
     ]
   },
@@ -2204,18 +2269,22 @@ const ORAL_FICHES = [
     title: 'Alcool, stupéfiants, médicaments',
     sections: [
       { title: '1 : ALCOOL', subsections: [
+        { name: 'L\'alcool au volant est l\'une des principales causes de mortalité sur les routes', bullets: [] },
+        { name: '', bullets: ['1 verre (dose bar) fait monter l\'alcoolémie de 0.20 à 0.25 g/sang','Taux maximum atteint en 1h (repas) ou 30 minutes (si à jeun)','Diminution de l\'alcoolémie de 0.10 à 0.15 g/sang (par heure)'] },
         { name: 'Effets :', bullets: ['Euphorie / agressivité / diminution de la peur / prise de risque','Champ visuel réduit et vision trouble','Diminution des réflexes et augmentation du temps de réaction','Perte de mémoire','Fatigue et endormissement'] },
-        { name: 'Sanctions CONTRAVENTION (alcoolémie entre 0,20 et 0,79 g/sang) :', bullets: ['135 € d\'amende + immobilisation du véhicule + retrait 6 pts du permis'] },
-        { name: 'Sanctions DÉLIT (alcoolémie à partir de 0,80 g/sang) :', bullets: ['Amende 4500 € (maximum)','Suspension (3 ans maxi) ou annulation (récidive…)','Immobilisation véhicule / mise en fourrière / saisie du véhicule','Retrait 6 pts du permis','2 ans de prison (maximum)'] }
+        { name: 'Sanctions CONTRAVENTION — Si alcoolémie entre 0.20 et 0.79 g/sang (ou 0.10 et 0.39 mg/litre d\'air expiré) :', bullets: ['135 € d\'amende + immobilisation du véhicule + retrait 6 pts du permis'] },
+        { name: 'Sanctions DÉLIT — Si alcoolémie à partir de 0.80 g/sang (ou 0.40 mg/litre d\'air expiré) :', bullets: ['Amende 4500 € (maximum)','Suspension (3 ans maxi) ou annulation (récidive…)','Immobilisation véhicule / mise en fourrière / saisie du véhicule','Retrait 6 pts du permis','2 ans de prison (maximum)'] }
       ]},
       { title: '2 : STUPÉFIANTS', subsections: [
-        { name: 'Cannabis au volant = 2 fois plus de risque d\'accident', bullets: ['Contrôle des trajectoires plus difficile','Champ visuel réduit','Diminution des réflexes et augmentation du temps de réaction','Baisse de la vigilance et perte de mémoire','Fatigue et endormissement'] },
+        { name: 'Cannabis au volant = 2 fois plus de risque d\'accident', bullets: [] },
+        { name: 'Effets :', bullets: ['Contrôle des trajectoires plus difficile','Champ visuel réduit','Diminution des réflexes et augmentation du temps de réaction','Baisse de la vigilance et perte de mémoire','Fatigue et endormissement'] },
         { name: 'Sanctions DÉLIT (quel que soit le produit et la quantité) :', bullets: ['Amende 4500 € (maximum)','Suspension (3 ans maxi) ou annulation (récidive…)','Immobilisation véhicule / mise en fourrière / saisie du véhicule','Retrait 6 pts du permis','2 ans de prison (maximum)'] },
         { name: '', bullets: ['SI ALCOOL + STUPÉFIANTS = Prison (3 ans maxi) + 9000 € d\'amende','Conduite sous cannabis + alcool = 29 fois plus de risque d\'accident'] }
       ]},
       { title: '3 : MÉDICAMENTS', subsections: [
-        { name: 'Vérifier le pictogramme sur la boîte :', bullets: ['NIVEAU 1 — Soyez prudent : ne pas conduire sans avoir lu la notice','NIVEAU 2 — Soyez très prudent : ne pas conduire sans l\'avis d\'un professionnel de santé','NIVEAU 3 — NE PAS CONDUIRE : pour la reprise de la conduite, demandez l\'avis d\'un médecin'] },
-        { name: '', bullets: ['Risques : baisse de vigilance, endormissement, augmentation du temps de réaction','MÉDICAMENT + ALCOOL = effets indésirables qui augmentent le risque d\'accident'] }
+        { name: 'Vérifier le pictogramme sur la boîte :', bullets: ['NIVEAU 1 — SOYEZ PRUDENT : ne pas conduire sans avoir lu la notice','NIVEAU 2 — SOYEZ TRÈS PRUDENT : ne pas conduire sans l\'avis d\'un professionnel de santé','NIVEAU 3 — NE PAS CONDUIRE : pour la reprise de la conduite, demandez l\'avis d\'un médecin'] },
+        { name: 'Risques :', bullets: ['Baisse de vigilance, endormissement, augmentation du temps de réaction'] },
+        { name: '', bullets: ['MÉDICAMENT + ALCOOL = Effets indésirables qui augmente le risque d\'accident'] }
       ]}
     ]
   },
@@ -2248,16 +2317,24 @@ const ORAL_FICHES = [
     title: 'Porte à faux – Angles morts',
     sections: [
       { title: 'PORTE À FAUX (P.A.F.)', subsections: [
-        { name: '1 : CONNAISSANCE DU VÉHICULE', bullets: ['P.A.F avant : Distance entre l\'axe de roue AV et l\'extrémité AV de l\'autocar (2,50m en moyenne)','P.A.F arrière : Distance entre l\'axe roue AR et extrémité AR de l\'autocar (3,50m en moyenne)'] },
-        { name: '2 : SITUATIONS PARTICULIÈRES', bullets: ['Surveiller particulièrement les P.A.F lors des changements de direction','Dans les passages étroits','Durant les manœuvres'] },
-        { name: '3 : DANGERS', bullets: ['Le braquage du volant provoque un « balayage » du P.A.F','Exemple : Je tourne à DROITE, mon P.A.F arrière se déporte vers la GAUCHE','Risques : renverser un piéton ou un deux-roues / toucher un véhicule, une barrière, un mur…'] },
-        { name: '4 : PRÉCAUTIONS', bullets: ['Regarder dans le rétro opposé au braquage du volant','Bien se placer et avoir une bonne trajectoire'] }
+        { name: '1 : CONNAISSANCE DU VÉHICULE', bullets: [] },
+        { name: 'P.A.F avant :', bullets: ['Distance entre l\'axe de roue AV et l\'extrémité AV de l\'autocar (2,50m en moyenne)'] },
+        { name: 'P.A.F arrière :', bullets: ['Distance entre l\'axe roue AR et extrémité AR de l\'autocar (3,50m en moyenne)'] },
+        { name: '2 : SITUATIONS PARTICULIÈRES', bullets: [] },
+        { name: 'Surveiller particulièrement des P.A.F. :', bullets: ['Lors des changements de direction','Dans les passages étroits','Durant les manœuvres'] },
+        { name: '3 : DANGERS', bullets: [] },
+        { name: 'Le braquage du volant provoque un « balayage » du P.A.F :', bullets: ['Exemple : Je tourne à DROITE, mon P.A.F arrière se déporte vers la GAUCHE'] },
+        { name: 'Risques :', bullets: ['Renverser un piéton ou un deux-roues','Toucher un véhicule, une barrière, un mur…'] },
+        { name: '4 : PRÉCAUTIONS :', bullets: ['Regarder dans le rétro opposé au braquage du volant','Bien se placer et avoir une bonne trajectoire'] }
       ]},
       { title: 'ANGLES MORTS (A.M.)', subsections: [
-        { name: '1 : CONNAISSANCE DU VÉHICULE', bullets: ['Les angles morts sont des zones de non-visibilité depuis le poste de conduite','Ils sont situés : à l\'arrière de l\'autocar / sur les côtés (hors du champ des rétroviseurs) / devant l\'autocar (zone d\'1m20 de hauteur sur 1m de long)'] },
-        { name: '2 : SITUATIONS PARTICULIÈRES', bullets: ['Surveiller particulièrement les A.M. lors des changements de direction (intersection / giratoire)','Lors d\'un dépassement','Lors d\'une insertion','Durant les manœuvres'] },
+        { name: '1 : CONNAISSANCE DU VÉHICULE', bullets: [] },
+        { name: 'Les angles morts sont des zones de non-visibilité depuis le poste de conduite :', bullets: [] },
+        { name: 'Ils sont situés :', bullets: ['À l\'arrière de l\'autocar ou de l\'autobus','Sur les côtés (hors du champ des rétroviseurs)','Devant l\'autocar (zone d\'1m20 de hauteur sur 1m de long)'] },
+        { name: '2 : SITUATIONS PARTICULIÈRES', bullets: [] },
+        { name: 'Surveiller particulièrement les A.M. :', bullets: ['Lors des changements de direction (intersection / giratoire)','Lors d\'un dépassement','Lors d\'une insertion','Durant les manœuvres'] },
         { name: '3 : DANGERS', bullets: ['Collision vers l\'arrière avec piétons / véhicules / obstacle…','Au démarrage, ne pas voir un piéton devant le camion','En dépassant, ne pas voir un autre véhicule qui dépasse (2 roues…)'] },
-        { name: '4 : PRÉCAUTIONS', bullets: ['Tourner la tête','Bien régler les rétroviseurs','Utiliser les rétroviseurs « grand angle », « d\'accostage » et « antéviseur »','En manœuvre : utiliser le radar de recul, la caméra 360° et le bip de recul / se faire aider / descendre du véhicule en cas de doute'] }
+        { name: '4 : PRÉCAUTIONS :', bullets: ['Tourner la tête','Bien régler les rétroviseurs','Utiliser les rétroviseurs « grand angle », « d\'accostage » et « antéviseur »','En manœuvre : utiliser le radar de recul, la caméra 360° et le bip de recul / se faire aider / descendre du véhicule en cas de doute'] }
       ]}
     ]
   },
@@ -2267,16 +2344,16 @@ const ORAL_FICHES = [
     title: 'Comportement en tunnels et aux passages à niveau',
     sections: [
       { title: '1 : TUNNELS', subsections: [
-        { name: 'Conduire en sécurité :', bullets: ['Avoir une quantité de carburant suffisante (tunnel du mont blanc 12 km)','S\'informer de l\'ouverture du tunnel (internet/radio/panneau dynamique)','Tenir compte de la signalisation à l\'entrée (hauteur, largeur, tonnage, limitation de vitesse, distance de sécurité…)','Allumer les feux de croisement et respecter les distances de sécurité dans le tunnel (diode bleue)','Ralentir avant de sortir (risque d\'éblouissement)'] },
-        { name: 'En cas d\'arrêt (bouchon…) :', bullets: ['Ne pas faire demi-tour et respecter les distances de sécurité','Mettre les feux détresse si dernier de la file','Couper le moteur, fermer les vitres, mettre le recyclage d\'air'] },
-        { name: 'En cas d\'urgence (panne…) :', bullets: ['S\'arrêter le plus à droite possible dans un emplacement prévu (refuge…)','Mettre les feux détresse et le gilet « haute visibilité »','Se diriger vers une borne d\'appel d\'urgence'] },
+        { name: 'Conduire en sécurité :', bullets: ['Avoir une quantité de carburant suffisante (tunnel du Mont Blanc 12 km)','S\'informer de l\'ouverture du tunnel (internet/radio/panneau dynamique)','Tenir compte de la signalisation à l\'entrée (hauteur, largeur, tonnage, limitation de vitesse, distance de sécurité…)','Allumer les feux de croisement et respecter les distances de sécurité dans le tunnel (diode bleue)','Ralentir avant de sortir (risque d\'éblouissement)'] },
+        { name: 'En cas d\'arrêt (bouchon…) :', bullets: ['Ne pas faire demi-tour et respecter les distances de sécurité','Mettre les feux de détresse si dernier de la file','Couper le moteur, fermer les vitres, mettre le recyclage d\'air'] },
+        { name: 'En cas d\'urgence (panne…) :', bullets: ['S\'arrêter le plus à droite possible dans un emplacement prévu (refuge…)','Mettre les feux de détresse et le gilet « haute visibilité »','Se diriger vers une borne d\'appel d\'urgence'] },
         { name: 'En cas d\'incendie :', bullets: ['S\'arrêter immédiatement et mettre les feux de détresse','Couper le moteur et laisser les clés sur le contact','Utiliser l\'extincteur de l\'autocar (ou ceux placés dans les niches)','Évacuer les passagers et aider ceux qui sont en difficulté','Regagner un abri (en vert) à l\'opposé des fumées','Prévenir les secours (borne d\'appel d\'urgence)'] }
       ]},
       { title: '2 : PASSAGE À NIVEAU (P.N.)', subsections: [
         { name: 'Différents types :', bullets: ['PN avec demi-barrières automatiques (les plus fréquents)','PN sans barrière (rares et plutôt dangereux)','PN avec barrières manuelles (très rares)'] },
         { name: 'Données statistiques :', bullets: ['15 400 passages à niveau en France','110 collisions / 24 tués et 8 blessés graves (en 2021)','98% des accidents sont dus au non-respect du Code de la route'] },
         { name: 'Précautions :', bullets: ['Tenir compte de la signalisation : RALENTIR et S\'ARRÊTER si feux rouges allumés','Adapter son allure en fonction du PN (dos d\'âne, PN étroit…)','Attention au gabarit du véhicule : hauteur (risque d\'arc électrique) / largeur (risque d\'accrochage) / longueur (s\'assurer de pouvoir dégager rapidement)','Ne pas rétrograder sur le PN'] },
-        { name: 'En cas d\'urgence :', bullets: ['Casser les barrières','Si le véhicule est coincé sur les voies, évacuer les passagers, les mettre en sécurité et utiliser le poste de secours du PN'] }
+        { name: 'En cas d\'urgence :', bullets: ['Casser les barrières','Si le véhicule est coincé sur les voies : évacuer les passagers, les mettre en sécurité et utiliser le poste de secours du PN'] }
       ]}
     ]
   },
