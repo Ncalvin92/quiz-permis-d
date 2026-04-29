@@ -684,7 +684,7 @@
       <h1>Quiz Permis D</h1>
       <p>CATÉGORIE D — TRANSPORT EN COMMUN</p>
     </div>
-    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 12</div>
+    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 14b</div>
   </div>
 
   <!-- HOME -->
@@ -1763,26 +1763,27 @@ const TOTAL = ALL_QUESTIONS.length;
 //   quizCount: number
 // ═══════════════════════════════════════════════
 
-const APP_VERSION = 'v12'; // Changer à chaque mise à jour pour reset les stats
+const APP_VERSION = 'v14b'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
 
 function loadStats() {
   try {
-    // Reset automatique si nouvelle version
-    const storedVersion = localStorage.getItem('permisD_version');
-    if (storedVersion !== APP_VERSION) {
-      localStorage.removeItem('permisD_stats_v2');
-      localStorage.removeItem('permisD_stats');
-      localStorage.removeItem('permisD_oral_stats');
-      localStorage.setItem('permisD_version', APP_VERSION);
-    }
     const s = localStorage.getItem('permisD_stats_v2');
-    if (s) return JSON.parse(s);
-    // Migration depuis ancienne version
+    if (s) {
+      const parsed = JSON.parse(s);
+      // S'assurer que les nouveaux champs existent (migration progressive)
+      if (!parsed.modeStats) parsed.modeStats = {};
+      if (!parsed.cycleQueue) parsed.cycleQueue = {};
+      if (!parsed.revisionList) parsed.revisionList = [];
+      return parsed;
+    }
+    // Migration depuis ancienne version (permisD_stats)
     const old = localStorage.getItem('permisD_stats');
     if (old) {
       const o = JSON.parse(old);
-      const migrated = { mastered: {}, wrong: o.wrong || {}, failedLast: o.failedLast || [], quizCount: o.quizCount || 0 };
-      // Considère les "seen" sans erreur comme maîtrisées
+      const migrated = {
+        mastered: {}, wrong: o.wrong || {}, failedLast: o.failedLast || [],
+        quizCount: o.quizCount || 0, modeStats: {}, cycleQueue: {}, revisionList: []
+      };
       Object.keys(o.seen || {}).forEach(id => {
         if (!(o.wrong || {})[id]) migrated.mastered[id] = true;
       });
@@ -1790,7 +1791,9 @@ function loadStats() {
       return migrated;
     }
     return { mastered: {}, wrong: {}, failedLast: [], quizCount: 0, modeStats: {}, cycleQueue: {}, revisionList: [] };
-  } catch(e) { return { mastered: {}, wrong: {}, failedLast: [], quizCount: 0, modeStats: {}, cycleQueue: {}, revisionList: [] }; }
+  } catch(e) {
+    return { mastered: {}, wrong: {}, failedLast: [], quizCount: 0, modeStats: {}, cycleQueue: {}, revisionList: [] };
+  }
 }
 
 function saveStats(stats) {
@@ -1819,7 +1822,7 @@ function doResetStats() {
   localStorage.removeItem('permisD_stats_v2');
   localStorage.removeItem('permisD_stats');
   localStorage.removeItem('permisD_oral_stats');
-  // Init aide-mémoire : si class "show", afficher
+  // Les quiz en pause sont conservés intentionnellement
   document.querySelectorAll('.memo-body.show').forEach(el => {
     el.style.display = 'block';
     const title = el.previousElementSibling;
@@ -1828,8 +1831,17 @@ function doResetStats() {
       if (arr) arr.textContent = '▲';
     }
   });
+  // Charger les quiz en pause (persistants entre sessions et versions)
+  loadPausedStates();
   updateHomeStats();
 }
+
+function resetAllIncludingPaused() {
+  doResetStats();
+  clearAllPausedStates();
+  updateHomeStats();
+}
+
 
 function recordResults(results, mode) {
   const stats = loadStats();
@@ -1919,6 +1931,48 @@ function consumeCycleQueue(mode, usedIds) {
 // Ajout dans recordResults pour la compatibilité avec les nouvelles structures
 const _origRecordResults = recordResults;
 
+
+// ═══════════════════════════════════════════════
+// PERSISTANCE DES QUIZ EN PAUSE (localStorage)
+// ═══════════════════════════════════════════════
+const PAUSED_KEY = 'permisD_paused_v1';
+
+function savePausedStates() {
+  try {
+    localStorage.setItem(PAUSED_KEY, JSON.stringify(pausedStates));
+  } catch(e) {}
+}
+
+function loadPausedStates() {
+  try {
+    const s = localStorage.getItem(PAUSED_KEY);
+    if (s) {
+      pausedStates = JSON.parse(s);
+      // Convertir les tableaux de questions (objets simples) en références vers ALL_QUESTIONS
+      // pour éviter les données corrompues
+      ['all','permisd','memo','failed','revision'].forEach(mode => {
+        const st = pausedStates[mode];
+        if (st && st.questions) {
+          // Reconstituer les questions depuis ALL_QUESTIONS par id
+          const byId = {};
+          ALL_QUESTIONS.forEach(q => byId[q.id] = q);
+          st.questions = st.questions.map(q => byId[q.id] || q).filter(Boolean);
+        }
+      });
+    }
+  } catch(e) { pausedStates = {}; }
+}
+
+function clearPausedState(mode) {
+  delete pausedStates[mode];
+  savePausedStates();
+}
+
+function clearAllPausedStates() {
+  pausedStates = {};
+  savePausedStates();
+}
+
 function updateHomeStats() {
   const stats = loadStats();
   const masteredCount = Object.keys(stats.mastered).length;
@@ -1979,12 +2033,11 @@ function updateHomeStats() {
     }
   }
 
-  // Badge "En pause" sur le mode concerné
+  // Badge "⏸ En pause" sur chaque mode avec un quiz en attente
   ['all','permisd','memo','failed','revision','oral'].forEach(m => {
     const el = document.getElementById('mode-' + m);
     if (!el) return;
-    const hasPause = (m !== 'oral' && savedQuizState && savedQuizState.mode === m) ||
-                     (m === 'oral' && savedOralState);
+    const hasPause = !!pausedStates[m];
     const badge = el.querySelector('.pause-badge');
     if (hasPause) {
       if (!badge) {
@@ -2288,9 +2341,14 @@ function getQuestionsForMode(mode) {
 let questions, answers, current;
 let quizResults = [];
 
-// État sauvegardé pour reprendre le quiz
-let savedQuizState = null; // { questions, answers, quizResults, current, mode }
-let savedOralState = null; // { oralFiches, oralCurrent, oralResults, oralSavedInputs, oralSavedScores, mode }
+// États sauvegardés PAR MODE (multi-pause)
+// pausedStates['permisd'] = { questions, answers, quizResults, current, mode }
+// pausedStates['oral']    = { oralFiches, oralCurrent, oralResults, oralSavedInputs, oralSavedScores }
+let pausedStates = {}; // remplace savedQuizState et savedOralState
+
+// Compatibilité — accès directs via getters
+function getSavedQuizState(mode) { return pausedStates[mode] || null; }
+function getSavedOralState()     { return pausedStates['oral'] || null; }
 
 
 // ═══════════════════════════════════════════════
@@ -2298,7 +2356,7 @@ let savedOralState = null; // { oralFiches, oralCurrent, oralResults, oralSavedI
 // ═══════════════════════════════════════════════
 
 function showResumeModal() {
-  const s = savedQuizState;
+  const s = getSavedQuizState(currentMode);
   const modeLabels = {
     all: 'Tout mélangé', permisd: 'Permis D', memo: 'Mémo CTCR',
     failed: 'Questions ratées', revision: 'Révision'
@@ -2310,8 +2368,8 @@ function showResumeModal() {
   modal.id = 'resume-modal';
   modal.innerHTML = `
     <div class="modal-box">
-      <h3>⏸ Quiz en pause</h3>
-      <p>Tu as un quiz <strong>${label}</strong> en cours — question <strong>${s.current + 1}/${s.questions.length}</strong> (${answered} réponse${answered > 1 ? 's' : ''} donnée${answered > 1 ? 's' : ''}).</p>
+      <h3>⏸ Quiz en pause — ${label}</h3>
+      <p>Question <strong>${s.current + 1}/${s.questions.length}</strong> · ${answered} réponse${answered > 1 ? 's' : ''} donnée${answered > 1 ? 's' : ''}.</p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="resumeQuiz()">▶ Reprendre où j'en étais</button>
         <button class="modal-btn danger" onclick="restartQuizFresh()">🔄 Recommencer un nouveau quiz</button>
@@ -2323,13 +2381,13 @@ function showResumeModal() {
 function resumeQuiz() {
   const m = document.getElementById('resume-modal');
   if (m) m.remove();
-  if (!savedQuizState) { startQuiz(true); return; }
-  // Restaurer l'état
-  questions = savedQuizState.questions;
-  answers = savedQuizState.answers;
-  quizResults = savedQuizState.quizResults;
-  current = savedQuizState.current;
-  // Ne pas effacer savedQuizState — on le garde jusqu'à la fin du quiz
+  const s = getSavedQuizState(currentMode);
+  if (!s) { startQuiz(true); return; }
+  questions = s.questions;
+  answers = s.answers;
+  quizResults = s.quizResults;
+  current = s.current;
+  // Garder l'état en pause jusqu'à la fin du quiz
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('results-screen').style.display = 'none';
   document.getElementById('oral-screen').style.display = 'none';
@@ -2343,8 +2401,8 @@ function resumeQuiz() {
 function restartQuizFresh() {
   const m = document.getElementById('resume-modal');
   if (m) m.remove();
-  savedQuizState = null;
-  startQuiz(true); // true = pas de vérification du state sauvegardé
+  clearPausedState(currentMode);
+  startQuiz(true);
 }
 
 // ═══════════════════════════════════════════════
@@ -2352,23 +2410,24 @@ function restartQuizFresh() {
 // ═══════════════════════════════════════════════
 
 function quitOralConfirm() {
-  // Sauvegarder l'état oral courant
-  savedOralState = {
+  // Sauvegarder dans pausedStates + localStorage
+  pausedStates['oral'] = {
     oralFiches: [...oralFiches],
     oralCurrent,
     oralResults: {...oralResults},
     oralSavedInputs: JSON.parse(JSON.stringify(oralSavedInputs)),
     oralSavedScores: JSON.parse(JSON.stringify(oralSavedScores)),
   };
+  savePausedStates();
   const total = oralFiches.length;
-  const done = oralCurrent;
+  const done = Object.keys(oralResults).length;
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.id = 'quit-oral-modal';
   modal.innerHTML = `
     <div class="modal-box">
       <h3>⏸ Quitter les fiches orales ?</h3>
-      <p>Tu es à la fiche <strong>${oralCurrent + 1}/${total}</strong> (${done} fiche${done > 1 ? 's' : ''} évaluée${done > 1 ? 's' : ''}).</p>
+      <p>Fiche <strong>${oralCurrent + 1}/${total}</strong> · ${done} fiche${done > 1 ? 's' : ''} évaluée${done > 1 ? 's' : ''}.</p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="closeOralQuitModal()">▶ Continuer</button>
         <button class="modal-btn secondary" onclick="quitOralAndSave()">⏸ Quitter et reprendre plus tard</button>
@@ -2385,18 +2444,19 @@ function closeOralQuitModal() {
 
 function quitOralAndSave() {
   closeOralQuitModal();
+  updateHomeStats();
   goHome();
 }
 
 function quitOralAndRestart() {
-  savedOralState = null;
+  clearPausedState('oral');
   closeOralQuitModal();
   goHome();
 }
 
 function showResumeOralModal() {
-  const s = savedOralState;
-  const done = s.oralCurrent;
+  const s = getSavedOralState();
+  const done = Object.keys(s.oralResults).length;
   const total = s.oralFiches.length;
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
@@ -2404,7 +2464,7 @@ function showResumeOralModal() {
   modal.innerHTML = `
     <div class="modal-box">
       <h3>⏸ Fiches orales en pause</h3>
-      <p>Tu as des fiches orales en cours — fiche <strong>${done + 1}/${total}</strong> (${done} fiche${done > 1 ? 's' : ''} évaluée${done > 1 ? 's' : ''}).</p>
+      <p>Fiche <strong>${s.oralCurrent + 1}/${total}</strong> · ${done} fiche${done > 1 ? 's' : ''} évaluée${done > 1 ? 's' : ''}.</p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="resumeOral()">▶ Reprendre où j'en étais</button>
         <button class="modal-btn danger" onclick="restartOralFresh()">🔄 Recommencer depuis le début</button>
@@ -2416,15 +2476,14 @@ function showResumeOralModal() {
 function resumeOral() {
   const m = document.getElementById('resume-oral-modal');
   if (m) m.remove();
-  if (!savedOralState) { startOral(); return; }
-  // Restaurer l'état oral
-  oralFiches = savedOralState.oralFiches;
-  oralCurrent = savedOralState.oralCurrent;
-  oralResults = {...savedOralState.oralResults};
-  oralSavedInputs = JSON.parse(JSON.stringify(savedOralState.oralSavedInputs));
-  oralSavedScores = JSON.parse(JSON.stringify(savedOralState.oralSavedScores));
+  const s = getSavedOralState();
+  if (!s) { startOral(); return; }
+  oralFiches = s.oralFiches;
+  oralCurrent = s.oralCurrent;
+  oralResults = {...s.oralResults};
+  oralSavedInputs = JSON.parse(JSON.stringify(s.oralSavedInputs));
+  oralSavedScores = JSON.parse(JSON.stringify(s.oralSavedScores));
   oralRevealed = false;
-
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('quiz-screen').style.display = 'none';
   document.getElementById('results-screen').style.display = 'none';
@@ -2436,27 +2495,30 @@ function resumeOral() {
 function restartOralFresh() {
   const m = document.getElementById('resume-oral-modal');
   if (m) m.remove();
-  savedOralState = null;
+  clearPausedState('oral');
   startOral();
 }
 
 function quitQuizConfirm() {
-  // Sauvegarder l'état courant au moment du clic
-  savedQuizState = {
+  const total = questions.length;
+  // Pré-sauvegarder en mémoire ET localStorage
+  pausedStates[currentMode] = {
     questions: [...questions],
     answers: [...answers],
     quizResults: [...quizResults],
     current,
     mode: currentMode
   };
-  const total = questions.length;
+  savePausedStates();
+  const modeLabels = { all:'Tout mélangé', permisd:'Permis D', memo:'Mémo CTCR', failed:'Questions ratées', revision:'Révision' };
+  const label = modeLabels[currentMode] || currentMode;
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.id = 'quit-modal';
   modal.innerHTML = `
     <div class="modal-box">
       <h3>⏸ Quitter le quiz ?</h3>
-      <p>Tu es à la question <strong>${current + 1}/${total}</strong>. Que veux-tu faire ?</p>
+      <p>Mode <strong>${label}</strong> · Question <strong>${current + 1}/${total}</strong>. Que veux-tu faire ?</p>
       <div class="modal-actions">
         <button class="modal-btn primary" onclick="closeModal()">▶ Continuer le quiz</button>
         <button class="modal-btn secondary" onclick="quitAndSave()">⏸ Quitter et reprendre plus tard</button>
@@ -2469,29 +2531,28 @@ function quitQuizConfirm() {
 function closeModal() {
   const m = document.getElementById('quit-modal');
   if (m) m.remove();
+  // Si on reste dans le quiz, effacer la sauvegarde temporaire (on continue)
 }
 
 function quitAndSave() {
-  // L'état est déjà sauvegardé dans savedQuizState
+  // État déjà sauvegardé dans pausedStates + localStorage
   closeModal();
+  updateHomeStats();
   goHome();
 }
 
 function quitAndRestart() {
-  // Effacer l'état sauvegardé → le prochain quiz repart de zéro
-  savedQuizState = null;
+  clearPausedState(currentMode);
   closeModal();
   goHome();
 }
 
 function startQuiz(resume) {
-  // Si un état sauvegardé existe pour ce mode, proposer de reprendre
-  if (!resume && savedQuizState && savedQuizState.mode === currentMode) {
+  // Si un état en pause existe pour ce mode, proposer de reprendre
+  if (!resume && getSavedQuizState(currentMode)) {
     showResumeModal();
     return;
   }
-  // Effacer l'état sauvegardé si on relance volontairement (pas resume)
-  if (!resume) savedQuizState = null;
 
   const pool = getQuestionsForMode(currentMode);
   if (pool.length === 0) {
@@ -2654,7 +2715,7 @@ function showResults() {
   let score=0;
   const items = questions.map((q,i)=>{ const ok=isCorrect(answers[i],q.correct,q.id); if(ok)score++; quizResults[i]=ok; return{q,ans:answers[i],ok}; });
   recordResults(items.map(item=>({id:item.q.id,correct:item.ok})), currentMode);
-  savedQuizState = null; // Quiz terminé normalement, effacer l'état sauvegardé
+  clearPausedState(currentMode); // Quiz terminé normalement
   const totalQ = questions.length;
   const pct=Math.round(score/totalQ*100);
   const cls=pct>=80?'great':pct>=60?'ok':'bad';
@@ -3038,9 +3099,23 @@ function saveOralStats(stats) {
   try { localStorage.setItem('permisD_oral_stats', JSON.stringify(stats)); } catch(e) {}
 }
 
-function startOral() {
-  // Si un état oral sauvegardé existe, proposer de reprendre
-  if (savedOralState) {
+
+function restartOralFromResults() {
+  // Recommencer les fiches orales directement depuis la page de résultats
+  document.getElementById('oral-results-screen').style.display = 'none';
+  // Réinitialiser l'état oral
+  oralResults = {};
+  oralSavedInputs = {};
+  oralSavedScores = {};
+  oralRevealed = false;
+  clearPausedState('oral');
+  // Relancer sans passer par l'accueil
+  startOral(true); // true = forcer le lancement sans check pause
+}
+
+function startOral(forceStart) {
+  // Si un état oral en pause existe (et pas un relancement forcé), proposer de reprendre
+  if (!forceStart && getSavedOralState()) {
     showResumeOralModal();
     return;
   }
@@ -3166,9 +3241,7 @@ function renderOral() {
     ${buildFicheInputHTML(fiche)}
   `;
 
-  const btnNext = document.getElementById('oral-btn-next');
-  btnNext.textContent = 'Révéler le corrigé ▼';
-  btnNext.onclick = () => revealOral();
+  updateOralNavButtons('blank');
 }
 
 function revealOral() {
@@ -3221,8 +3294,14 @@ function revealOral() {
     </div>
   `;
 
-  document.getElementById('oral-btn-next').textContent = '— Évalue ci-dessus —';
-  document.getElementById('oral-btn-next').onclick = null;
+  const btnNextRev = document.getElementById('oral-btn-next');
+  btnNextRev.textContent = '— Évalue ci-dessus —';
+  btnNextRev.style.background = '';
+  btnNextRev.onclick = null;
+  // Le bouton retour reste actif pour navigation
+  const btnBackRev = document.getElementById('oral-btn-back');
+  btnBackRev.disabled = oralCurrent === 0;
+  btnBackRev.onclick = oralBack;
 }
 
 function oralEval(ok) {
@@ -3235,11 +3314,27 @@ function oralEval(ok) {
   }
   saveOralStats(oralStats);
 
-  oralCurrent++;
-  if (oralCurrent >= oralFiches.length) {
-    showOralResults();
+  const isLastFiche = oralCurrent === oralFiches.length - 1;
+  const allDone = oralFiches.every(f => oralResults[f.id] !== undefined);
+
+  if (isLastFiche && allDone) {
+    // Dernière fiche évaluée ET toutes les fiches sont faites
+    // Rester sur cette fiche et afficher le bouton "Voir mes résultats"
+    renderOralRevealed(fiche);
+  } else if (isLastFiche) {
+    // C'était la dernière dans l'ordre mais il reste des fiches non faites
+    // Aller à la première fiche non évaluée
+    const firstUndone = oralFiches.findIndex(f => oralResults[f.id] === undefined);
+    if (firstUndone >= 0) {
+      oralCurrent = firstUndone;
+      renderOral();
+    } else {
+      renderOralRevealed(fiche);
+    }
   } else {
-    renderOral();
+    // Avancer à la fiche suivante (vierge ou évaluée)
+    oralCurrent++;
+    renderOralWithResult();
   }
 }
 
@@ -3278,6 +3373,10 @@ function doRestartCurrentFiche() {
   renderOral();
 }
 
+// ═══════════════════════════════════════════════
+// NAVIGATION ORALE — logique centralisée
+// ═══════════════════════════════════════════════
+
 function oralBack() {
   if (oralCurrent > 0) {
     oralCurrent--;
@@ -3285,7 +3384,14 @@ function oralBack() {
   }
 }
 
-// Affiche la fiche avec son résultat déjà sauvegardé (si révélé)
+function oralForward() {
+  if (oralCurrent < oralFiches.length - 1) {
+    oralCurrent++;
+    renderOralWithResult();
+  }
+}
+
+// Dispatche selon l'état de la fiche courante
 function renderOralWithResult() {
   const fiche = oralFiches[oralCurrent];
   const alreadyEvaluated = oralResults[fiche.id] !== undefined;
@@ -3296,30 +3402,77 @@ function renderOralWithResult() {
   }
 }
 
-// Affiche le corrigé d'une fiche déjà évaluée (retour en arrière) avec toutes les réponses
-function renderOralRevealed(fiche) {
+// Met à jour le header (compteur + barre)
+function updateOralHeader() {
   const total = oralFiches.length;
   document.getElementById('oral-current').textContent = oralCurrent + 1;
   document.getElementById('oral-total').textContent = total;
   document.getElementById('oral-progress-fill').style.width = ((oralCurrent / total) * 100) + '%';
   renderOralGraph();
-  document.getElementById('oral-btn-back').disabled = oralCurrent === 0;
+}
+
+// Met à jour les boutons de navigation bas (Retour / bouton principal)
+function updateOralNavButtons(mode) {
+  // mode : 'blank' (fiche vierge) | 'revealed' (évaluée) | 'last_revealed' (dernière évaluée, toutes faites)
+  const btnBack = document.getElementById('oral-btn-back');
+  const btnNext = document.getElementById('oral-btn-next');
+
+  btnBack.disabled = oralCurrent === 0;
+  btnBack.textContent = '← Retour';
+  btnBack.onclick = oralBack;
+
+  if (mode === 'blank') {
+    btnNext.textContent = 'Révéler le corrigé ▼';
+    btnNext.onclick = revealOral;
+  } else if (mode === 'last_all_done') {
+    btnNext.textContent = '🏁 Voir mes résultats';
+    btnNext.style.background = '#22c55e';
+    btnNext.onclick = showOralResults;
+  } else {
+    // fiche évaluée, pas la dernière — ou dernière mais pas toutes faites
+    const isLast = oralCurrent === oralFiches.length - 1;
+    const allDone = oralFiches.every(f => oralResults[f.id] !== undefined);
+    if (isLast && allDone) {
+      btnNext.textContent = '🏁 Voir mes résultats';
+      btnNext.style.background = '#22c55e';
+      btnNext.onclick = showOralResults;
+    } else if (isLast) {
+      // Dernière fiche évaluée mais il reste des fiches non faites avant
+      btnNext.textContent = '→ Fiche suivante';
+      btnNext.style.background = '';
+      btnNext.onclick = oralForward;
+    } else {
+      btnNext.textContent = '→ Fiche suivante';
+      btnNext.style.background = '';
+      btnNext.onclick = oralForward;
+    }
+  }
+}
+
+// Affiche le corrigé d'une fiche déjà évaluée avec navigation complète
+function renderOralRevealed(fiche) {
+  updateOralHeader();
 
   const ok = oralResults[fiche.id];
   const resultColor = ok === true ? '#22c55e' : '#ef4444';
   const resultIcon = ok === true ? '✅ Maîtrisée' : '❌ À reprendre';
 
-  // Récupérer les réponses sauvegardées
   const savedInputs = oralSavedInputs[fiche.id] || {};
   const savedScore = oralSavedScores[fiche.id] || { scorePct: 0, foundBullets: 0, totalBullets: 0 };
   const { scorePct, foundBullets, totalBullets } = savedScore;
   const scoreColor = scorePct >= 80 ? '#22c55e' : scorePct >= 50 ? '#f59e0b' : '#ef4444';
 
+  const isLast = oralCurrent === oralFiches.length - 1;
+  const allDone = oralFiches.every(f => oralResults[f.id] !== undefined);
+
   const area = document.getElementById('oral-card-area');
   area.innerHTML = `
-    <div style="background:${ok?'var(--green-bg)':'var(--red-bg)'};border:1px solid ${ok?'var(--green-border)':'var(--red-border)'};border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-      <span style="font-size:16px;">${ok?'✅':'❌'}</span>
-      <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:${resultColor}">${resultIcon} — Fiche déjà évaluée</span>
+    <div style="background:${ok?'var(--green-bg)':'var(--red-bg)'};border:1px solid ${ok?'var(--green-border)':'var(--red-border)'};border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;">${ok?'✅':'❌'}</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:${resultColor}">${resultIcon}</span>
+      </div>
+      <span style="font-size:11px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;letter-spacing:0.04em;">Fiche ${oralCurrent+1}/${oralFiches.length}</span>
     </div>
     ${buildFicheCorrectHTML(fiche, savedInputs)}
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-top:12px;">
@@ -3328,9 +3481,8 @@ function renderOralRevealed(fiche) {
       <button style="width:100%;padding:11px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;" onclick="restartCurrentFicheConfirm()">🔄 Recommencer cette fiche</button>
     </div>`;
 
-  const btnNext = document.getElementById('oral-btn-next');
-  btnNext.textContent = 'Fiche suivante →';
-  btnNext.onclick = () => { oralCurrent++; if (oralCurrent >= oralFiches.length) showOralResults(); else renderOral(); };
+  // Mettre à jour les boutons de nav du bas
+  updateOralNavButtons('revealed');
 }
 
 function oralNext() { } // géré dynamiquement
@@ -3345,7 +3497,7 @@ function showOralResults() {
   const failedIds = oralFiches.filter(f => oralResults[f.id] === false).map(f => f.id);
   oralStats.failedLast = failedIds;
   saveOralStats(oralStats);
-  savedOralState = null; // Fiches orales terminées, effacer l'état sauvegardé
+  clearPausedState('oral'); // Fiches orales terminées
 
   const total = oralFiches.length;
   const okCount = oralFiches.filter(f => oralResults[f.id] === true).length;
@@ -3382,7 +3534,7 @@ function showOralResults() {
   });
 
   html += `</div>
-    <button class="btn-restart" onclick="goHome()">🔄 Recommencer les fiches orales</button>
+    <button class="btn-restart" onclick="restartOralFromResults()">🔄 Recommencer les fiches orales</button>
     <button class="btn-home" onclick="goHome()">← Retour à l'accueil</button>
   `;
   rs.innerHTML = html;
