@@ -699,7 +699,7 @@
       <h1>Quiz Permis D</h1>
       <p>CATÉGORIE D — TRANSPORT EN COMMUN</p>
     </div>
-    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 20d</div>
+    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 27</div>
   </div>
 
   <!-- HOME -->
@@ -787,11 +787,13 @@
       </button>
       <button class="mode-btn" id="mode-failed" onclick="setMode('failed')">
         <span class="mode-icon">⚡</span>Questions ratées<br>
-        <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0"><span id="mode-failed-count">0</span> questions</span>
+        <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0"><span id="mode-failed-count">0</span> questions</span><br>
+        <span id="modestats-failed" style="font-size:11px;color:#22c55e;font-weight:700">—</span>
       </button>
       <button class="mode-btn" id="mode-revision" onclick="setMode('revision')">
         <span class="mode-icon">📖</span>Révision<br>
-        <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0"><span id="mode-revision-count">0</span> questions</span>
+        <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0"><span id="mode-revision-count">0</span> questions</span><br>
+        <span id="modestats-revision" style="font-size:11px;font-weight:700">—</span>
       </button>
     </div>
 
@@ -808,88 +810,12 @@
     </div>
 
     <div class="memo-section">
-      <div class="memo-title open" onclick="toggleMemo(this)">
+      <div class="memo-title" onclick="toggleMemo(this)">
         📋 Aide-mémoire réglementation
         <span class="arr">▼</span>
       </div>
-      <div class="memo-body show">
-        <h3>Durées de conduite</h3>
-        <ul>
-          <li>Continue : <span>4h30</span> (nuit : <span>4h</span>)</li>
-          <li>Journalière : <span>9h</span> (max 10h, 2x/semaine)</li>
-          <li>Hebdomadaire : <span>56h</span></li>
-          <li>Sur 2 semaines : <span>90h</span></li>
-        </ul>
-        <h3>Temps de pause</h3>
-        <ul>
-          <li>Continue : <span>45 min</span></li>
-          <li>Fractionnée : <span>15 min + 30 min</span></li>
-        </ul>
-        <h3>Temps de repos</h3>
-        <ul>
-          <li>Journalier normal : <span>11h</span></li>
-          <li>Journalier fractionné : <span>3h + 9h</span> (12h total)</li>
-          <li>Repos réduit : <span>9h</span></li>
-          <li>Hebdomadaire non-réduit : <span>45h</span></li>
-          <li>Amplitude max : <span>14h</span></li>
-        </ul>
-        <h3>Chronotachygraphe numérique</h3>
-        <ul>
-          <li>Contrôle technique : <span>tous les 2 ans</span></li>
-          <li>Panne : réparation sous <span>7 jours</span></li>
-          <li>Perte/vol carte : <span>15 jours</span></li>
-          <li>Transfert données carte : <span>56 jours maxi</span></li>
-          <li>Transfert données chronotachy : <span>90 jours maxi</span></li>
-          <li>Archivage : <span>1 an</span></li>
-          <li>Employeur : transfert chronotachy <span>28 jours maxi</span></li>
-        </ul>
-        <h3>Caractéristiques du véhicule (PTAC)</h3>
-        <table>
-          <tr><th>Essieux</th><th>PTAC</th><th>Longueur</th></tr>
-          <tr><td>2 essieux</td><td>19 T</td><td>13,5 m</td></tr>
-          <tr><td>3 essieux</td><td>26 T</td><td>15 m</td></tr>
-          <tr><td>3 essieux articulé</td><td>—</td><td>18,75 m</td></tr>
-          <tr><td>4 essieux</td><td>32 T</td><td>24,5 m</td></tr>
-          <tr><td>Essieu isolé</td><td>13 T</td><td>—</td></tr>
-          <tr><td colspan="3" style="color:var(--accent2);font-weight:600;">Largeur max : 2,55 m</td></tr>
-        </table>
-        <h3>Vitesses limites</h3>
-        <ul>
-          <li>Brouillard (visibilité &lt;50m) : <span>50 km/h</span></li>
-          <li>Agglomération (portion relevée 70) : <span>70 km/h</span></li>
-          <li>Autobus à l'arrière : <span>70 km/h</span></li>
-          <li>Pluie sur route prioritaire : <span>80 km/h</span></li>
-          <li>Autocar (arrière) : <span>90 km/h et 100 km/h</span></li>
-          <li>Limiteur autocar / autoroute : <span>100 km/h</span></li>
-        </ul>
-        <h3>Contrôle technique TEC</h3>
-        <ul>
-          <li>Périodicité : <span>tous les 6 mois</span></li>
-          <li>Lettre A = <span>Accepté</span></li>
-          <li>Lettre S = <span>Sursis</span> (contre-visite sous 1 mois)</li>
-          <li>Lettre R = <span>Refusé</span></li>
-        </ul>
-        <h3>Visites médicales conducteurs</h3>
-        <ul>
-          <li>Jusqu'à 60 ans : <span>tous les 5 ans</span></li>
-          <li>À partir de 60 ans : <span>tous les ans</span></li>
-        </ul>
-        <h3>Poids voyageur forfaitaire</h3>
-        <ul>
-          <li>Autobus : <span>65 kg</span></li>
-          <li>Autocar : <span>70 kg</span></li>
-        </ul>
-        <h3>Barrière de dégel</h3>
-        <ul>
-          <li>Véhicule TC peut circuler à vide sur route barrière 12T : <span>OUI</span></li>
-          <li>Si marqué "demi-charge" : <span>NON</span></li>
-        </ul>
-        <h3>Majoration PTAC avec ralentisseur</h3>
-        <ul>
-          <li>Ralentisseur 400 kg → majoration : <span>400 kg</span></li>
-          <li>Ralentisseur 600 kg → majoration : <span>500 kg</span></li>
-        </ul>
-        <h3>Alcool — seuils et sanctions</h3>
+      <div class="memo-body">
+        <h3>⭐ Alcool — seuils et sanctions</h3>
         <ul>
           <li>Contravention : <span>0,20 à 0,79 g/sang</span> → 135€ + 6 pts retrait</li>
           <li>Délit : <span>à partir de 0,80 g/sang</span> → 4500€ max + 2 ans prison</li>
@@ -897,20 +823,20 @@
           <li>Cannabis seul : <span>2×</span> plus de risque d'accident</li>
           <li>Cannabis + alcool : <span>29×</span> plus de risque</li>
         </ul>
-        <h3>Dépassement — distances latérales</h3>
+        <h3>⭐ Dépassement — distances latérales</h3>
         <ul>
           <li>Piéton/2 roues en agglo : <span>1 m minimum</span></li>
           <li>Piéton/2 roues hors agglo : <span>1,50 m minimum</span></li>
           <li>Distance avant de se rabattre : <span>50 m minimum</span></li>
           <li>3ème voie autoroute interdite pour véhicule <span>&gt;3,5t ou &gt;7m</span></li>
         </ul>
-        <h3>Porte-à-faux (PAF)</h3>
+        <h3>⭐ Porte-à-faux (PAF)</h3>
         <ul>
           <li>PAF avant (moyenne) : <span>2,50 m</span></li>
           <li>PAF arrière (moyenne) : <span>3,50 m</span></li>
           <li>Je tourne à DROITE → PAF arrière se déporte à <span>GAUCHE</span></li>
         </ul>
-        <h3>Systèmes de sécurité</h3>
+        <h3>⭐ Systèmes de sécurité</h3>
         <ul>
           <li>ABS/ABR = <span>Anti Blocage des Roues</span></li>
           <li>ESP = <span>Stabilisateur Électronique Programmable</span></li>
@@ -918,14 +844,14 @@
           <li>ASR = <span>Anti-patinage des roues</span></li>
           <li>EAD = <span>Éthylotest Anti-Démarrage</span></li>
         </ul>
-        <h3>Passages à niveau</h3>
+        <h3>⭐ Passages à niveau</h3>
         <ul>
           <li>15 400 PN en France</li>
           <li>98% des accidents = non-respect Code de la route</li>
           <li>Type le plus fréquent : <span>demi-barrières automatiques</span></li>
           <li>Urgence sur voies : <span>évacuer passagers + poste secours PN</span></li>
         </ul>
-        <h3>Éco-conduite</h3>
+        <h3>⭐ Éco-conduite</h3>
         <ul>
           <li>Objectifs : <span>économie carburant, moins d'usure, réduire pollution</span></li>
           <li>Changer de vitesse à <span>bas régime</span></li>
@@ -1007,6 +933,24 @@
           <li>Limiteur / autoroute → <span>100 km/h</span></li>
         </ul>
       </div>
+
+    <!-- CONSIGNE -->
+    <div class="memo-section">
+      <div class="memo-title" onclick="toggleMemo(this)">
+        📌 Consignes d'utilisation
+        <span class="arr">▼</span>
+      </div>
+      <div class="memo-body">
+        <ol style="padding-left:18px;margin:0;line-height:2;">
+          <li>Vous pouvez sélectionner <strong>Tout mélangé</strong> ou choisir l'un des 6 modes, puis lancer le quiz.</li>
+          <li>Pour la signalisation, si vous avez un doute, le numéro de la fiche est affiché en bleu au-dessus de la question. Vérifiez ensuite sur le document papier.</li>
+          <li>Pour réinitialiser toutes les statistiques, cliquez sur <strong>« Réinitialiser toute la progression »</strong>. Pour réinitialiser un seul mode, utilisez la section <strong>« Réinitialiser les stats d'un mode »</strong> et choisissez le mode concerné.</li>
+          <li>La lecture vocale est <strong>désactivée par défaut</strong>. Pour l'activer, lancez un quiz et cliquez sur le bouton <strong>Lecture vocale</strong> au-dessus de la question jusqu'à ce qu'il devienne vert.</li>
+          <li>Dans le quiz, vous pouvez activer la <strong>barre de progression</strong> en cliquant sur <strong>« BARRES DE PROGRESSION »</strong>. Elle vous indique si votre réponse à la question précédente était correcte. <em>Conseil : désactivez-la quand vous vous sentez prêt afin de vous placer dans les conditions d'un examen.</em></li>
+          <li>Dans <strong>« Aide-mémoire réglementation »</strong>, vous trouverez les principaux points clés à connaître pour les fiches.</li>
+        </ol>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -1028,7 +972,7 @@
       </div>
       <div class="vocal-toggle-row">
         <label class="toggle-switch">
-          <input type="checkbox" id="tts-toggle-quiz" onchange="toggleTTS(this)" checked>
+          <input type="checkbox" id="tts-toggle-quiz" onchange="toggleTTS(this)">
           <div class="toggle-track"></div>
           <div class="toggle-thumb"></div>
         </label>
@@ -1071,7 +1015,7 @@
       </div>
       <div class="vocal-toggle-row">
         <label class="toggle-switch">
-          <input type="checkbox" id="tts-toggle-oral" onchange="toggleTTS(this)" checked>
+          <input type="checkbox" id="tts-toggle-oral" onchange="toggleTTS(this)">
           <div class="toggle-track"></div>
           <div class="toggle-thumb"></div>
         </label>
@@ -1796,7 +1740,7 @@ const TOTAL = ALL_QUESTIONS.length;
 //   quizCount: number
 // ═══════════════════════════════════════════════
 
-const APP_VERSION = 'v20d'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
+const APP_VERSION = 'v27'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
 
 function loadStats() {
   try {
@@ -1908,7 +1852,7 @@ function recordResults(results, mode) {
 // ═══════════════════════════════════════════════
 // LECTURE VOCALE (TTS) — Text-to-Speech
 // ═══════════════════════════════════════════════
-let ttsEnabled = true; // Activé par défaut
+let ttsEnabled = false; // Désactivé par défaut
 let ttsLastText = '';
 
 // ─── ElevenLabs API (optionnel) ───────────────────────────────────
@@ -1926,18 +1870,29 @@ let elAudio = null;
 
 function toggleTTS(cb) {
   ttsEnabled = cb.checked;
-  if (!ttsEnabled) {
-    if (elAudio) { elAudio.pause(); elAudio = null; }
-    window.speechSynthesis && window.speechSynthesis.cancel();
-  }
-  // Synchroniser les deux checkboxes
   ['tts-toggle-quiz', 'tts-toggle-oral'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.checked = ttsEnabled;
   });
   try { localStorage.setItem('permisD_tts', ttsEnabled ? '1' : '0'); } catch(e) {}
-}
 
+  if (!ttsEnabled) {
+    stopTTS();
+    ttsLastText = '';
+    return;
+  }
+  // Activé → lire la question affichée
+  const quizVisible = document.getElementById('quiz-screen') &&
+                      document.getElementById('quiz-screen').style.display !== 'none';
+  const oralVisible = document.getElementById('oral-screen') &&
+                      document.getElementById('oral-screen').style.display !== 'none';
+  if (quizVisible && questions && questions[current]) {
+    speakText(questions[current].q || '');
+  } else if (oralVisible && oralFiches && oralFiches[oralCurrent]) {
+    const f = oralFiches[oralCurrent];
+    speakText(f.num + ' — ' + f.title);
+  }
+}
 
 // ─── Configuration ElevenLabs ─────────────────────────────────────
 function saveELKey(key) {
@@ -1978,12 +1933,12 @@ function loadELConfig() {
 function loadTTSPref() {
   try {
     const v = localStorage.getItem('permisD_tts');
-    // v === null → jamais configuré → laisser la valeur par défaut (true)
-    // v === '0' → désactivé explicitement par l'utilisateur
-    if (v === '0') {
-      ttsEnabled = false;
+    // v === null → jamais configuré → désactivé par défaut
+    // v === '1' → activé explicitement par l'utilisateur
+    if (v === '1') {
+      ttsEnabled = true;
     } else {
-      ttsEnabled = true; // Activé par défaut ou si v === '1'
+      ttsEnabled = false; // Désactivé par défaut ou si v === '0'
     }
     // Synchroniser les deux checkboxes avec l'état réel
     ['tts-toggle-quiz', 'tts-toggle-oral'].forEach(id => {
@@ -2054,32 +2009,40 @@ const TTS_EXPAND = {
 // ─────────────────────────────────────────────
 const TTS_LIAISONS = [
 
-  // ── 1. vis-à-vis → "vis à vis" (tiret + à) ──
+  // ── 1. vis-à-vis ──
   [/vis-à-vis/gi, 'vis à vis'],
 
-  // ── 2. Forme -t- euphonique + pronom ──
-  // "enregistre-t-elle", "a-t-on", "doivent-ils" — TOUJOURS ajouter virgule avant pronom
-  [/([a-zàâéèêëîïôùûüç]+)-t-(il|ils|elle|elles|on)/gi,
-   (m, v, p) => v + ', ' + p],
+  // ── 2. Forme -t- euphonique (enregistre-t-elle, a-t-on…)
+  //    Le "t" est déjà phonétique → on l'écrit "telle", "til", "ton" etc.
+  //    → verbe + pause forte + "t" + pronom collé
+  [/([a-zàâéèêëîïôùûüç]+)-t-(il)/gi,    (m,v) => v + '... til'],
+  [/([a-zàâéèêëîïôùûüç]+)-t-(ils)/gi,   (m,v) => v + '... tils'],
+  [/([a-zàâéèêëîïôùûüç]+)-t-(elle)/gi,  (m,v) => v + '... telle'],
+  [/([a-zàâéèêëîïôùûüç]+)-t-(elles)/gi, (m,v) => v + '... telles'],
+  [/([a-zàâéèêëîïôùûüç]+)-t-(on)/gi,    (m,v) => v + '... ton'],
 
-  // ── 3. Verbes finissant par consonne + -il/ils/elle/elles/on ──
-  // "peut-il", "doivent-ils", "font-ils" → "peut, il" etc.
-  // Couvre TOUS les verbes, pas seulement une liste fixe
-  [/([a-zàâéèêëîïôùûüç]{3,})-(il|ils|elle|elles|on|nous|vous)/gi,
-   (m, v, p) => v + ', ' + p],
+  // ── 3. Verbe + tiret + pronom → pause forte + pronom isolé
+  //    "peut-il" → "peut... il"  (pause casse la liaison /t/ parasite)
+  //    Couvre TOUS les cas : peut, doit, faut, fait, dit, va, est, etc.
+  [/([a-zàâéèêëîïôùûüç]{2,})-(il)/gi,    (m,v) => v + '... il'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(ils)/gi,   (m,v) => v + '... ils'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(elle)/gi,  (m,v) => v + '... elle'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(elles)/gi, (m,v) => v + '... elles'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(on)/gi,    (m,v) => v + '... on'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(nous)/gi,  (m,v) => v + '... nous'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(vous)/gi,  (m,v) => v + '... vous'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(je)/gi,    (m,v) => v + '... je'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(tu)/gi,    (m,v) => v + '... tu'],
+  [/([a-zàâéèêëîïôùûüç]{2,})-(ce)/gi,    (m,v) => v + '... ce'],
 
-  // ── 4. Verbe + -je / -tu ──
-  [/([a-zàâéèêëîïôùûüç]+)-(je|tu)/gi,
-   (m, v, p) => v + ' ' + p],
+  // ── 4. est-ce que ──
+  [/est-ce\s+que?/gi, 'est ce que'],
+  [/est-ce/gi, 'est ce'],
 
-  // ── 5. est-ce (que) ──
-  [/est-(ce(?:\s+que)?)/gi, 'est ce'],
+  // ── 5. y a-t-il / y a-t-elle / y a-t-on ──
+  [/y\s*a-t-(il|ils|elle|elles|on)/gi, (m,p) => 'y a... t' + p],
 
-  // ── 6. y a-t-il, y a-t-elle, etc. ──
-  [/y\s+a-t-(il|ils|elle|elles|on)/gi,
-   (m, p) => 'y a, ' + p],
-
-  // ── 7. Tirets résiduels entre mots (vis-à-vis déjà traité avant) ──
+  // ── 6. Tirets résiduels entre mots ──
   [/([a-zàâéèêëîïôùûüç])-([a-zàâéèêëîïôùûüç])/gi, '$1 $2'],
 ];
 
@@ -2149,7 +2112,8 @@ function preprocessTTS(text) {
 
   // 4. Nombres avec unités
   t = t.replace(/(\d+(?:[.,]\d+)?)\s*t\b/g, '$1 tonnes');
-  t = t.replace(/(\d+(?:[.,]\d+)?)\s*m\b(?!ètres|inutes)/g, '$1 mètres');
+  t = t.replace(/(\d+)[,.](\d+)\s*m\b(?!ètres|inutes)/g, '$1 mètres $2');
+  t = t.replace(/(\d+)\s*m\b(?!ètres|inutes)/g, '$1 mètres');
   t = t.replace(/(\d+)\s*h\b(?!eures)/g, '$1 heures');
   t = t.replace(/(\d+)\s*mn\b/g, '$1 minutes');
   t = t.replace(/(\d+)\s*min\b/g, '$1 minutes');
@@ -2534,33 +2498,29 @@ function restoreOralSession() {
   if (m) m.remove();
   const data = loadActiveOral();
   if (!data) return;
-  // Reconstituer les fiches orales depuis les IDs
-  // oralFiches est peuplé dans startOral — on doit le faire ici aussi
-  const allFiches = typeof ORAL_FICHES !== 'undefined' ? ORAL_FICHES : oralFiches;
-  // Utiliser la liste globale des fiches
+
+  // Reconstituer oralFiches depuis ORAL_FICHES global (toujours disponible)
+  // en respectant l'ordre sauvegardé (ficheIds)
   const ficheById = {};
-  if (typeof ORAL_FICHES_DATA !== 'undefined') {
-    ORAL_FICHES_DATA.forEach(f => ficheById[f.id] = f);
+  ORAL_FICHES.forEach(f => ficheById[f.id] = f);
+
+  if (data.ficheIds && data.ficheIds.length > 0) {
+    oralFiches = data.ficheIds.map(id => ficheById[id]).filter(Boolean);
   }
-  oralCurrent = data.oralCurrent;
+  // Fallback : ordre par défaut si ficheIds manquant
+  if (!oralFiches || oralFiches.length === 0) {
+    oralFiches = [...ORAL_FICHES];
+  }
+
+  oralCurrent = data.oralCurrent || 0;
   oralResults = data.oralResults || {};
   oralSavedInputs = data.oralSavedInputs || {};
   oralSavedScores = data.oralSavedScores || {};
   oralRevealed = false;
-  // Si oralFiches est vide, lancer startOral qui va le peupler puis reprendre
-  if (!oralFiches || oralFiches.length === 0) {
-    startOral(true); // force start
-    // Après startOral, restaurer l'état
-    setTimeout(() => {
-      oralCurrent = data.oralCurrent;
-      oralResults = data.oralResults || {};
-      oralSavedInputs = data.oralSavedInputs || {};
-      oralSavedScores = data.oralSavedScores || {};
-      renderOralWithResult();
-    }, 50);
-    return;
-  }
-  document.getElementById('home-screen').style.display = 'none';
+
+  ['home-screen','quiz-screen','results-screen','oral-results-screen'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
   document.getElementById('oral-screen').style.display = 'block';
   renderOralWithResult();
 }
@@ -2671,7 +2631,7 @@ function updateHomeStats() {
     el.innerHTML = tot > 0 ? `
       <div class="mpb-header">
         <span class="mpb-label">${mc.label}</span>
-        <span class="mpb-pct" style="color:${barColor}">${pct}% <span style="font-size:11px;color:var(--muted)">(${ms.correct}✓ ${ms.wrong}✗)</span></span>
+        <span class="mpb-pct" style="color:${barColor}">${pct}% <span style="font-size:11px;">(<span style="color:#22c55e;font-weight:700">${ms.correct}✓</span> <span style="color:#ef4444;font-weight:700">${ms.wrong}✗</span>)</span></span>
       </div>
       <div class="mpb-track"><div class="mpb-fill" style="width:${pct}%;background:${barColor}"></div></div>
     ` : '';
@@ -2828,6 +2788,22 @@ const STRICT_ANSWERS = {
   'f11q5': ['centre de controle des vehicules lourds', 'centre de controle des vehicule lourd'],
   // Porte-à-faux arrière
   'f20q6': ['porte-a-faux arriere', 'porte a faux arriere', 'porte a faux (arriere)', 'porte-a-faux (arriere)'],
+  // Pause fractionnée 15+30 (ordre)
+  'memo_rse_q8': [
+    '15 mn + 30 mn', '15mn + 30mn', '15 mn et 30 mn', '15mn et 30mn',
+    '15 min + 30 min', '15min + 30min', '15 min et 30 min', '15min et 30min',
+    '15 minutes + 30 minutes', '15 minutes et 30 minutes',
+    '15 minute + 30 minute', '15 minute et 30 minute',
+    '15 mn a 30 mn', '15min a 30min', '15 min a 30 min',
+  ],
+  'memo_rse_q9': [
+    '15 mn d\'abord puis 30 mn', '15 mn d\'abord 30 mn',
+    '15 min d\'abord puis 30 min', '15 min d\'abord 30 min',
+    '15 minutes d\'abord puis 30 minutes', '15 minutes d\'abord 30 minutes',
+    '15 mn + 30 mn', '15 min + 30 min', '15 minutes + 30 minutes',
+    '15 mn et 30 mn', '15 min et 30 min', '15 minutes et 30 minutes',
+    '15 a 30', '15 puis 30',
+  ],
 };
 
 function isCorrectStrict(ans, qId) {
@@ -3467,6 +3443,8 @@ function showResults() {
   </div>
   <button class="btn-restart" onclick="startQuiz()">🔄 Nouveau quiz</button><button class="btn-home" onclick="goHome()">← Retour à l'accueil</button>`;
   rs.innerHTML=html;
+  stopTTS();
+  ttsLastText = ''; // Quiz terminé — effacer le texte mémorisé
   window.scrollTo(0,0);
 }
 
@@ -3867,6 +3845,85 @@ function renderOralGraph() {
 }
 
 // Construit la carte de SAISIE : titres + sous-titres visibles, bullets = zones de texte
+
+// ─────────────────────────────────────────────
+// SYNONYMES pour l'évaluation des fiches orales
+// ─────────────────────────────────────────────
+const ORAL_SYNONYMS = {
+  'effectuer': ['faire','réaliser','accomplir','exécuter','procéder'],
+  'faire':     ['effectuer','réaliser','accomplir','exécuter'],
+  'réaliser':  ['effectuer','faire','accomplir','exécuter'],
+  'utiliser':  ['employer','se servir','user de'],
+  'employer':  ['utiliser','se servir'],
+  'vérifier':  ['contrôler','inspecter','examiner'],
+  'contrôler': ['vérifier','inspecter','examiner','surveiller'],
+  'surveiller':['contrôler','vérifier','observer'],
+  'observer':  ['surveiller','regarder','noter'],
+  'conduire':  ['piloter','driver','guider'],
+  'adapter':   ['ajuster','modifier','régler'],
+  'réduire':   ['diminuer','baisser','limiter'],
+  'augmenter': ['accroître','hausser','élever'],
+  'signaler':  ['indiquer','avertir','prévenir'],
+  'prévenir':  ['signaler','avertir','informer'],
+  'avertir':   ['prévenir','signaler','alerter'],
+  'informer':  ['prévenir','avertir','notifier'],
+  'respecter': ['suivre','observer','appliquer'],
+  'appliquer': ['respecter','suivre','mettre en oeuvre'],
+  'assurer':   ['garantir','veiller','s\'assurer'],
+  'garantir':  ['assurer','certifier'],
+  'éviter':    ['prévenir','empêcher','écarter'],
+  'empêcher':  ['éviter','prévenir','bloquer'],
+  'obligatoire':['requis','imposé','nécessaire'],
+  'nécessaire':['obligatoire','requis','indispensable'],
+  'interdire': ['prohiber','défendre'],
+  'supérieur': ['plus grand','au dessus','au delà'],
+  'inférieur': ['plus petit','en dessous','en deçà'],
+};
+
+function normalizeOralText(s) {
+  return s
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // accents
+    .replace(/[<>()\[\]{}/\\|"']/g, ' ')           // caractères spéciaux
+    .replace(/[^a-z0-9 ]/g, ' ')                       // tout le reste
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function oralTextMatches(userText, bulletText) {
+  const uNorm = normalizeOralText(userText);
+  const bNorm = normalizeOralText(bulletText);
+
+  const stopWords = new Set(['avec','pour','dans','vers','lors','dont','cette','comme',
+    'plus','sans','mais','donc','aussi','tout','tous','bien','peut','doit','etre',
+    'avoir','les','des','une','qui','que','par','sur','est','sont','aux','ses',
+    'ces','leur','leurs','ils','elles','nous','vous','mon','ton','son','entre']);
+
+  const keyWords = bNorm.split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
+  if (keyWords.length === 0) return uNorm.length > 0;
+
+  let matched = 0;
+  for (const kw of keyWords) {
+    if (uNorm.includes(kw)) {
+      matched++;
+      continue;
+    }
+    // Vérifier les synonymes
+    const syns = ORAL_SYNONYMS[kw] || [];
+    if (syns.some(syn => uNorm.includes(normalizeOralText(syn)))) {
+      matched++;
+      continue;
+    }
+    // Tolérance Levenshtein (fautes d'ortho)
+    const uWords = uNorm.split(' ');
+    if (uWords.some(uw => levenshtein(kw, uw) <= Math.max(1, Math.floor(kw.length / 5)))) {
+      matched++;
+    }
+  }
+  // Seuil : 50% des mots-clés suffisent (souple pour paraphrase naturelle)
+  return matched >= Math.ceil(keyWords.length * 0.5);
+}
+
 function buildFicheInputHTML(fiche) {
   let html = `<div class="oral-card"><div class="oral-card-header"><div class="oral-fiche-num">${fiche.num}</div><div class="oral-fiche-title">${fiche.title}</div></div><div class="oral-card-body">`;
   fiche.sections.forEach((sec, si) => {
@@ -3901,12 +3958,10 @@ function buildFicheCorrectHTML(fiche, inputValues) {
         return;
       }
       if (sub.name) html += `<div class="oral-subsection-title">${sub.name}</div>`;
-      const userText = (inputValues[si] && inputValues[si][subi]) ? inputValues[si][subi].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') : '';
+      const userText = (inputValues[si] && inputValues[si][subi]) ? inputValues[si][subi] : '';
       html += `<ul class="oral-bullets">`;
       sub.bullets.forEach(b => {
-        const bNorm = b.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        const keyWords = bNorm.split(/\W+/).filter(w => w.length > 3 && !['avec','pour','dans','vers','lors','dont','cette','comme','plus','sans','mais','donc','aussi','tout','tous','bien','peut','doit','etre','avoir','les','des','une','qui','que','par','sur'].includes(w));
-        const found = keyWords.length === 0 || keyWords.filter(w => userText.includes(w)).length >= Math.ceil(keyWords.length * 0.5);
+        const found = userText ? oralTextMatches(userText, b) : false;
         const col = userText ? (found ? 'color:#22c55e' : 'color:#ef4444') : 'color:var(--text)';
         const icon = userText ? (found ? '✓ ' : '✗ ') : '';
         html += `<li style="${col}">${icon}${b}</li>`;
@@ -3987,10 +4042,8 @@ function revealOral() {
       const userText = (inputValues[si] && inputValues[si][subi]) ? inputValues[si][subi].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') : '';
       sub.bullets.forEach(b => {
         totalBullets++;
-        const bNorm = b.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        const keyWords = bNorm.split(/\W+/).filter(w => w.length > 3 && !['avec','pour','dans','vers','lors','dont','cette','comme','plus','sans','mais','donc','aussi','tout','tous','bien','peut','doit','etre','avoir','les','des','une','qui','que','par','sur'].includes(w));
-        if (keyWords.length === 0) { if (userText) foundBullets++; }
-        else if (keyWords.filter(w => userText.includes(w)).length >= Math.ceil(keyWords.length * 0.5)) foundBullets++;
+        const rawUserText = (inputValues[si] && inputValues[si][subi]) ? inputValues[si][subi] : '';
+        if (rawUserText && oralTextMatches(rawUserText, b)) foundBullets++;
       });
     });
   });
@@ -4000,6 +4053,7 @@ function revealOral() {
   // Sauvegarder les réponses et le score pour le retour en arrière
   oralSavedInputs[fiche.id] = JSON.parse(JSON.stringify(inputValues));
   oralSavedScores[fiche.id] = { scorePct, foundBullets, totalBullets };
+  saveActiveOral(); // Persister après révélation
 
   const area = document.getElementById('oral-card-area');
   area.innerHTML = `
@@ -4035,6 +4089,19 @@ function oralEval(ok) {
     oralStats.mastered[fiche.id] = true;
   }
   saveOralStats(oralStats);
+
+  // Enregistrer dans modeStats['oral'] pour les barres de progression
+  const globalStats = loadStats();
+  if (!globalStats.modeStats) globalStats.modeStats = {};
+  if (!globalStats.modeStats['oral']) globalStats.modeStats['oral'] = { correct: 0, wrong: 0 };
+  if (ok) {
+    globalStats.modeStats['oral'].correct = (globalStats.modeStats['oral'].correct || 0) + 1;
+  } else {
+    globalStats.modeStats['oral'].wrong = (globalStats.modeStats['oral'].wrong || 0) + 1;
+  }
+  saveStats(globalStats);
+
+  saveActiveOral(); // Persister après évaluation
 
   const isLastFiche = oralCurrent === oralFiches.length - 1;
   const allDone = oralFiches.every(f => oralResults[f.id] !== undefined);
@@ -4259,14 +4326,39 @@ function showOralResults() {
   });
 
   html += `</div>
+    <div id="oral-cumul-stats"></div>
     <button class="btn-restart" onclick="restartOralFromResults()">🔄 Recommencer les fiches orales</button>
     <button class="btn-home" onclick="goHome()">← Retour à l'accueil</button>
   `;
   rs.innerHTML = html;
+
+  // Afficher les stats cumulées mode oral
+  const oralCumulEl = document.getElementById('oral-cumul-stats');
+  if (oralCumulEl) {
+    const gs = loadStats();
+    const ms = (gs.modeStats || {})['oral'] || { correct: 0, wrong: 0 };
+    const tot2 = ms.correct + ms.wrong;
+    const p2 = tot2 > 0 ? Math.round(ms.correct / tot2 * 100) : 0;
+    const col2 = p2 >= 80 ? '#22c55e' : p2 >= 50 ? '#f59e0b' : '#ef4444';
+    if (tot2 > 0) {
+      const div = document.createElement('div');
+      div.style.cssText = 'background:rgba(61,111,255,0.08);border:1px solid rgba(61,111,255,0.2);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:12px;text-align:center;';
+      div.innerHTML =
+        '<div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">📊 Stats cumulées — Fiches Orales</div>' +
+        '<div style="font-size:28px;font-weight:800;color:' + col2 + '">' + p2 + '%</div>' +
+        '<div style="font-size:12px;color:var(--muted)">' +
+        '<span style="color:#22c55e">' + ms.correct + '✓</span> · ' +
+        '<span style="color:#ef4444">' + ms.wrong + '✗</span> sur ' + tot2 + ' fiches évaluées</div>';
+      oralCumulEl.appendChild(div);
+    }
+  }
+
   window.scrollTo(0, 0);
 }
 
 function goHome() {
+  stopTTS();
+  ttsLastText = ''; // Effacer le texte mémorisé — on n'est plus dans un quiz
   ['results-screen','quiz-screen','oral-screen','oral-results-screen'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
