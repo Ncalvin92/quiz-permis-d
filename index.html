@@ -674,7 +674,22 @@
   .install-text strong { color: var(--accent2); font-weight: 600; }
   .btn-install { padding: 8px 16px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .btn-dismiss { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 4px; line-height: 1; }
-</style>
+
+  /* Toggle vocal */
+  .vocal-toggle-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .btn-repeat-vocal {
+    background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 4px 10px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 12px;
+    font-weight: 700; color: var(--muted); cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .btn-repeat-vocal:hover { background: var(--bg3); color: var(--text); }
+  .btn-repeat-vocal:active { transform: scale(0.96); }
+
+  </style>
 </head>
 <body>
 <div id="app">
@@ -684,7 +699,7 @@
       <h1>Quiz Permis D</h1>
       <p>CATÉGORIE D — TRANSPORT EN COMMUN</p>
     </div>
-    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 14b</div>
+    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 20d</div>
   </div>
 
   <!-- HOME -->
@@ -1011,6 +1026,15 @@
         </label>
         <span class="toggle-label">Barres de progression</span>
       </div>
+      <div class="vocal-toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="tts-toggle-quiz" onchange="toggleTTS(this)" checked>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="toggle-label">Lecture vocale</span>
+        <button class="btn-repeat-vocal" onclick="repeatTTS()" title="Relire la question">🔊 Répéter</button>
+      </div>
       <div class="quiz-progress-graph hidden" id="quiz-graph"></div>
       <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
     </div>
@@ -1044,6 +1068,15 @@
           <div class="toggle-thumb"></div>
         </label>
         <span class="toggle-label">Barres de progression</span>
+      </div>
+      <div class="vocal-toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="tts-toggle-oral" onchange="toggleTTS(this)" checked>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span class="toggle-label">Lecture vocale</span>
+        <button class="btn-repeat-vocal" onclick="repeatTTS()" title="Relire la fiche">🔊 Répéter</button>
       </div>
       <div class="quiz-progress-graph hidden" id="oral-graph"></div>
       <div class="progress-track"><div class="progress-fill" id="oral-progress-fill" style="width:0%"></div></div>
@@ -1763,7 +1796,7 @@ const TOTAL = ALL_QUESTIONS.length;
 //   quizCount: number
 // ═══════════════════════════════════════════════
 
-const APP_VERSION = 'v14b'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
+const APP_VERSION = 'v20d'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
 
 function loadStats() {
   try {
@@ -1833,6 +1866,10 @@ function doResetStats() {
   });
   // Charger les quiz en pause (persistants entre sessions et versions)
   loadPausedStates();
+  loadTTSPref();
+  loadELConfig();
+  // Détecter si un quiz était en cours lors du rechargement
+  checkAndRestoreActiveSession();
   updateHomeStats();
 }
 
@@ -1866,6 +1903,407 @@ function recordResults(results, mode) {
   saveStats(stats);
 }
 
+
+
+// ═══════════════════════════════════════════════
+// LECTURE VOCALE (TTS) — Text-to-Speech
+// ═══════════════════════════════════════════════
+let ttsEnabled = true; // Activé par défaut
+let ttsLastText = '';
+
+// ─── ElevenLabs API (optionnel) ───────────────────────────────────
+// Si tu as une clé ElevenLabs, colle-la ici pour une voix ultra-réaliste
+// Laisse vide ('') pour utiliser la voix du navigateur (gratuit)
+let ELEVENLABS_API_KEY = '';   // ← colle ta clé ici : "sk_..."
+// Voix recommandées (ID ElevenLabs) :
+//   Rachel  : "21m00Tcm4TlvDq8ikWAM"  (la plus naturelle, parfaite auto-école)
+//   Bella   : "EXAVITQu4vr4xnSDxMaL"  (douce, pédagogique)
+//   Domi    : "AZnzlk1XvdvUeBnXmlld"  (claire, neutre)
+let ELEVENLABS_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel par défaut
+
+// Audio ElevenLabs en cours (pour pouvoir arrêter)
+let elAudio = null;
+
+function toggleTTS(cb) {
+  ttsEnabled = cb.checked;
+  if (!ttsEnabled) {
+    if (elAudio) { elAudio.pause(); elAudio = null; }
+    window.speechSynthesis && window.speechSynthesis.cancel();
+  }
+  // Synchroniser les deux checkboxes
+  ['tts-toggle-quiz', 'tts-toggle-oral'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = ttsEnabled;
+  });
+  try { localStorage.setItem('permisD_tts', ttsEnabled ? '1' : '0'); } catch(e) {}
+}
+
+
+// ─── Configuration ElevenLabs ─────────────────────────────────────
+function saveELKey(key) {
+  ELEVENLABS_API_KEY = key.trim();
+  try { localStorage.setItem('permisD_el_key', ELEVENLABS_API_KEY); } catch(e) {}
+  const status = document.getElementById('el-status');
+  if (status) status.textContent = ELEVENLABS_API_KEY ? '✓ Clé enregistrée — ElevenLabs actif' : '';
+}
+
+function saveELVoice(voiceId) {
+  ELEVENLABS_VOICE_ID = voiceId;
+  try { localStorage.setItem('permisD_el_voice', ELEVENLABS_VOICE_ID); } catch(e) {}
+}
+
+function testELVoice() {
+  speakText("Bonjour, voici un exemple de lecture pour le quiz permis D.");
+}
+
+function loadELConfig() {
+  try {
+    const key = localStorage.getItem('permisD_el_key');
+    const voice = localStorage.getItem('permisD_el_voice');
+    if (key) {
+      ELEVENLABS_API_KEY = key;
+      const inp = document.getElementById('el-key-input');
+      if (inp) inp.value = key;
+      const status = document.getElementById('el-status');
+      if (status) status.textContent = '✓ Clé enregistrée — ElevenLabs actif';
+    }
+    if (voice) {
+      ELEVENLABS_VOICE_ID = voice;
+      const sel = document.getElementById('el-voice-select');
+      if (sel) sel.value = voice;
+    }
+  } catch(e) {}
+}
+
+function loadTTSPref() {
+  try {
+    const v = localStorage.getItem('permisD_tts');
+    // v === null → jamais configuré → laisser la valeur par défaut (true)
+    // v === '0' → désactivé explicitement par l'utilisateur
+    if (v === '0') {
+      ttsEnabled = false;
+    } else {
+      ttsEnabled = true; // Activé par défaut ou si v === '1'
+    }
+    // Synchroniser les deux checkboxes avec l'état réel
+    ['tts-toggle-quiz', 'tts-toggle-oral'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.checked = ttsEnabled;
+    });
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════
+// TTS — LECTURE VOCALE NATURELLE
+// ═══════════════════════════════════════════════
+
+// ─────────────────────────────────────────────
+// SIGLES À ÉPELER lettre par lettre
+// ─────────────────────────────────────────────
+const TTS_SPELL = {
+  // Espacement simple entre lettres = épellation fluide sans longues pauses
+  'PTAC': 'P T A C',
+  'PTRA': 'P T R A',
+  'CQC':  'C Q C',
+  'FCOS': 'F C O S',
+  'ABS':  'A B S',
+  'ASR':  'A S R',
+  'ESP':  'E S P',
+  'ABR':  'A B R',
+  'EAD':  'E A D',
+  'PAF':  'P A F',
+  'SAE':  'S A E',
+  'AFU':  'A F U',
+  'GPS':  'G P S',
+  'RSE':  'R S E',
+  'TEC':  'T E C',
+  'PL':   'P L',
+  'PN':   'P N',
+};
+
+// ─────────────────────────────────────────────
+// MOTS EN MAJUSCULES À LIRE NORMALEMENT (pas épelés)
+// ─────────────────────────────────────────────
+const TTS_READ_AS_WORD = new Set([
+  'FIMO',       // Formation Initiale Minimale Obligatoire → se lit comme un mot
+  'VRAI','FAUX','OUI','NON',
+  // Tous les mots français écrits en majuscules dans les questions → lus normalement
+  'ALCOOL','CARTE','PERTE','VOL','NUIT','PLUIE','GLACE','BROUILLARD','VENT',
+  'URGENCE','MOTEUR','VITESSE','ESSIEU','PAUSE','PANNE','RECUL','SURSIS',
+  'AMPLITUDE','CONTINUE','TOTALE','NORMALE','NORMAL',
+  'ARCHIVAGE','AUTOBUS','AUTOCAR','AUTOMATIQUE','AUTOMATIQUES','AVANT','CHARGE','CONTRAVENTION','CROISEMENT','DEMI','DESCENTE','DEUX','DIRECTION','DYSFONCTIONNEMENT','EMPLOYEUR','ESSUIE','FEUX','INCLUS','LIMITEUR','NIVEAU','PENDANT','PNEUMATIQUES','PORTE','PRESSION','ROUTES','SEMAINE','SEMAINES','TECHNIQUE','VIDE','VIRAGES','VOLANT',
+]);
+
+// ─────────────────────────────────────────────
+// EXPANSIONS TEXTUELLES
+// ─────────────────────────────────────────────
+const TTS_EXPAND = {
+  // Mots mal prononcés par le TTS → forcer la forme correcte
+  '\bcars\b':  'autocars',   // "cars" anglicisé → "autocars" prononcé en français
+  'km/h':  'kilomètres par heure',
+  'km/H':  'kilomètres par heure',
+  'KM/H':  'kilomètres par heure',
+  'km/s':  'kilomètres par seconde',
+  'm/s':   'mètres par seconde',
+  'CTCR':  'réglementation des transports',
+  'CHRONOTACHYGRAPHE': 'chronotachygraphe',
+};
+
+// ─────────────────────────────────────────────
+// LIAISONS avec tiret (peuvent-ils → peuvent ils, etc.)
+// ─────────────────────────────────────────────
+const TTS_LIAISONS = [
+
+  // ── 1. vis-à-vis → "vis à vis" (tiret + à) ──
+  [/vis-à-vis/gi, 'vis à vis'],
+
+  // ── 2. Forme -t- euphonique + pronom ──
+  // "enregistre-t-elle", "a-t-on", "doivent-ils" — TOUJOURS ajouter virgule avant pronom
+  [/([a-zàâéèêëîïôùûüç]+)-t-(il|ils|elle|elles|on)/gi,
+   (m, v, p) => v + ', ' + p],
+
+  // ── 3. Verbes finissant par consonne + -il/ils/elle/elles/on ──
+  // "peut-il", "doivent-ils", "font-ils" → "peut, il" etc.
+  // Couvre TOUS les verbes, pas seulement une liste fixe
+  [/([a-zàâéèêëîïôùûüç]{3,})-(il|ils|elle|elles|on|nous|vous)/gi,
+   (m, v, p) => v + ', ' + p],
+
+  // ── 4. Verbe + -je / -tu ──
+  [/([a-zàâéèêëîïôùûüç]+)-(je|tu)/gi,
+   (m, v, p) => v + ' ' + p],
+
+  // ── 5. est-ce (que) ──
+  [/est-(ce(?:\s+que)?)/gi, 'est ce'],
+
+  // ── 6. y a-t-il, y a-t-elle, etc. ──
+  [/y\s+a-t-(il|ils|elle|elles|on)/gi,
+   (m, p) => 'y a, ' + p],
+
+  // ── 7. Tirets résiduels entre mots (vis-à-vis déjà traité avant) ──
+  [/([a-zàâéèêëîïôùûüç])-([a-zàâéèêëîïôùûüç])/gi, '$1 $2'],
+];
+
+// ─────────────────────────────────────────────
+// PONCTUATION → pauses naturelles
+// On va découper intelligemment selon la ponctuation
+// ─────────────────────────────────────────────
+function splitIntoChunks(text) {
+  // Découper aux points, virgules, points-virgules, deux-points, parenthèses, points d'interrogation
+  // Chaque chunk sera lu avec une légère pause entre
+  const chunks = [];
+  // Séparer aux frontières de phrases d'abord
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  for (const sentence of sentences) {
+    if (!sentence.trim()) continue;
+    // Sous-découpage aux virgules et deux-points pour pauses internes
+    const sub = sentence.split(/,|;|:/);
+    for (let i = 0; i < sub.length; i++) {
+      const s = sub[i].trim();
+      if (!s) continue;
+      // Remettre la virgule/deux-points à la fin sauf dernière partie
+      const suffix = i < sub.length - 1 ? ',' : '';
+      chunks.push(s + suffix);
+    }
+  }
+  return chunks.filter(c => c.trim().length > 0);
+}
+
+// ─────────────────────────────────────────────
+// PRÉTRAITEMENT PRINCIPAL
+// ─────────────────────────────────────────────
+function preprocessTTS(text) {
+  let t = text;
+
+  // 1. Expansions textuelles (avant toute autre transformation)
+  for (const [abbr, expand] of Object.entries(TTS_EXPAND)) {
+    // Si la clé contient déjà des métacaractères regex (\b etc.), l'utiliser directement
+    const isRegex = abbr.includes('\\b') || abbr.includes('(') || abbr.includes('[');
+    const pattern = isRegex ? abbr : abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(pattern, 'gi'), expand);
+  }
+
+  // 2. Liaisons avec tiret — rétablir la fluidité
+  for (const [pattern, replacement] of TTS_LIAISONS) {
+    t = t.replace(pattern, replacement);
+  }
+
+
+  // ── "doit être", "peut être" → forcer coupure forte ──
+  // Le TTS fait une liaison /t/ parasite → insérer une pause marquée
+  t = t.replace(/\b(doit|peut|devrait|devra|sera|serait|pourrait|pouvait|devait)\s+(être)/gi,
+    (m, v, e) => v + '. ' + e);
+
+  // 3. Sigles : épelés OU lus comme un mot selon la liste
+  t = t.replace(/\b([A-Z]{2,8})\b/g, (match) => {
+    if (TTS_READ_AS_WORD.has(match)) {
+      // Lire comme un mot normal (minuscules)
+      return match.charAt(0) + match.slice(1).toLowerCase();
+    }
+    if (TTS_SPELL[match]) {
+      return TTS_SPELL[match];
+    }
+    // Sigle/mot inconnu en majuscules → mettre en minuscules (lu phonétiquement)
+    // Ex: "DESCENTE" → "descente", "CROISEMENT" → "croisement"
+    return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+  });
+
+  // 4. Nombres avec unités
+  t = t.replace(/(\d+(?:[.,]\d+)?)\s*t\b/g, '$1 tonnes');
+  t = t.replace(/(\d+(?:[.,]\d+)?)\s*m\b(?!ètres|inutes)/g, '$1 mètres');
+  t = t.replace(/(\d+)\s*h\b(?!eures)/g, '$1 heures');
+  t = t.replace(/(\d+)\s*mn\b/g, '$1 minutes');
+  t = t.replace(/(\d+)\s*min\b/g, '$1 minutes');
+
+  // 5. Guillemets et caractères spéciaux → pauses naturelles
+  t = t.replace(/"/g, ', ');
+  t = t.replace(/«|»/g, ', ');
+  t = t.replace(/\s{2,}/g, ' ');
+  t = t.trim();
+
+  return t;
+}
+
+function getBestFrenchVoice() {
+  if (!window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  // Priorité : voix françaises naturelles/premium connues
+  // Priorité aux voix FÉMININES françaises naturelles/premium
+  const preferred = [
+    // macOS / iOS — voix Apple Neural féminines
+    'Amélie', 'Amelie', 'Marie', 'Aurelie',
+    // Windows — voix Neural Microsoft féminines
+    'Microsoft Hortense Online (French)', 'Microsoft Hortense Online',
+    'Microsoft Hortense', 'Hortense',
+    // Android / Chrome — voix Google féminines
+    'Google français', 'Google French',
+    // Fallback voix masculines si aucune féminine disponible
+    'Thomas', 'Nicolas',
+    'Microsoft Paul Online', 'Microsoft Paul',
+  ];
+  for (const name of preferred) {
+    const v = voices.find(v => v.name.includes(name) && (v.lang.startsWith('fr') || v.lang === ''));
+    if (v) return v;
+  }
+  // Fallback : première voix fr disponible
+  return voices.find(v => v.lang === 'fr-FR') ||
+         voices.find(v => v.lang.startsWith('fr')) ||
+         null;
+}
+
+// ──────────────────────────────────────────────────
+// LECTURE PRINCIPALE — ElevenLabs si clé, sinon navigateur
+// ──────────────────────────────────────────────────
+function speakText(rawText) {
+  if (!ttsEnabled) return;
+  // Arrêter immédiatement toute lecture précédente
+  stopTTS();
+  ttsLastText = rawText;
+  const text = preprocessTTS(rawText);
+
+  if (ELEVENLABS_API_KEY && ELEVENLABS_API_KEY.length > 10) {
+    speakElevenLabs(text);
+  } else {
+    speakBrowser(text);
+  }
+}
+
+// ── ElevenLabs (voix ultra-réaliste) ──────────────
+async function speakElevenLabs(text) {
+  // Arrêter toute lecture en cours
+  if (elAudio) { elAudio.pause(); elAudio = null; }
+
+  try {
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_multilingual_v2',  // Meilleur modèle multilingue
+          voice_settings: {
+            stability: 0.55,          // Légère variation naturelle
+            similarity_boost: 0.85,   // Fidèle à la voix
+            style: 0.20,              // Ton calme/narratif
+            use_speaker_boost: true,  // Clarté maximale
+          },
+          // Paramètres SSML-like via pronunciation
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn('ElevenLabs API error:', response.status, '→ fallback navigateur');
+      speakBrowser(text);
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    elAudio = new Audio(url);
+    elAudio.playbackRate = 0.92;  // Légèrement plus lent pour style auto-école
+    elAudio.play();
+    elAudio.onended = () => { URL.revokeObjectURL(url); elAudio = null; };
+
+  } catch (e) {
+    console.warn('ElevenLabs error:', e, '→ fallback navigateur');
+    speakBrowser(text);
+  }
+}
+
+// ── Navigateur Web Speech API (fallback gratuit) ───
+function speakBrowser(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+
+  const chunks = splitIntoChunks(text);
+  if (chunks.length === 0) return;
+
+  let idx = 0;
+  const voice = getBestFrenchVoice();
+
+  function speakNext() {
+    if (idx >= chunks.length) return;
+    const chunk = chunks[idx].trim();
+    if (!chunk) { idx++; speakNext(); return; }
+
+    const utt = new SpeechSynthesisUtterance(chunk);
+    utt.lang = 'fr-FR';
+
+    const isQuestion = chunk.includes('?');
+    const isLong = chunk.length > 60;
+    const noPunctuation = chunks.length === 1 && !chunk.match(/[.,;:!?]/);
+    utt.rate  = (isQuestion || noPunctuation) ? 0.55 : isLong ? 0.60 : 0.65;
+    utt.pitch = 1.02;
+    utt.volume = 1.0;
+    if (voice) utt.voice = voice;
+
+    utt.onend = () => {
+      idx++;
+      const delay = (chunk.endsWith(',') || chunk.endsWith(';') || chunk.endsWith(':')) ? 120 : 180;
+      setTimeout(speakNext, delay);
+    };
+    utt.onerror = () => { idx++; setTimeout(speakNext, 80); };
+    window.speechSynthesis.speak(utt);
+  }
+
+  setTimeout(speakNext, 80);
+}
+
+function stopTTS() {
+  if (elAudio) { elAudio.pause(); elAudio = null; }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+function repeatTTS() {
+  if (!ttsLastText) return;
+  stopTTS();
+  speakText(ttsLastText);
+}
 
 // ═══════════════════════════════════════════════
 // NOUVELLES FONCTIONS — Cycle, Stats par mode, Révision
@@ -1937,6 +2375,63 @@ const _origRecordResults = recordResults;
 // ═══════════════════════════════════════════════
 const PAUSED_KEY = 'permisD_paused_v1';
 
+
+const ACTIVE_QUIZ_KEY = 'permisD_active_quiz'; // Quiz en cours (survit au rechargement)
+const ACTIVE_ORAL_KEY = 'permisD_active_oral'; // Fiches orales en cours
+
+function saveActiveQuiz() {
+  try {
+    localStorage.setItem(ACTIVE_QUIZ_KEY, JSON.stringify({
+      questions: questions.map(q => q.id), // sauvegarder les IDs seulement
+      answers: answers,
+      quizResults: quizResults,
+      current: current,
+      mode: currentMode
+    }));
+  } catch(e) {}
+}
+
+function clearActiveQuiz() {
+  localStorage.removeItem(ACTIVE_QUIZ_KEY);
+}
+
+function loadActiveQuiz() {
+  try {
+    const s = localStorage.getItem(ACTIVE_QUIZ_KEY);
+    if (!s) return null;
+    const data = JSON.parse(s);
+    const byId = {};
+    ALL_QUESTIONS.forEach(q => byId[q.id] = q);
+    const qs = data.questions.map(id => byId[id]).filter(Boolean);
+    if (qs.length === 0) return null;
+    return { questions: qs, answers: data.answers, quizResults: data.quizResults, current: data.current, mode: data.mode };
+  } catch(e) { return null; }
+}
+
+function saveActiveOral() {
+  try {
+    localStorage.setItem(ACTIVE_ORAL_KEY, JSON.stringify({
+      ficheIds: oralFiches.map(f => f.id),
+      oralCurrent,
+      oralResults,
+      oralSavedInputs,
+      oralSavedScores
+    }));
+  } catch(e) {}
+}
+
+function clearActiveOral() {
+  localStorage.removeItem(ACTIVE_ORAL_KEY);
+}
+
+function loadActiveOral() {
+  try {
+    const s = localStorage.getItem(ACTIVE_ORAL_KEY);
+    if (!s) return null;
+    return JSON.parse(s);
+  } catch(e) { return null; }
+}
+
 function savePausedStates() {
   try {
     localStorage.setItem(PAUSED_KEY, JSON.stringify(pausedStates));
@@ -1971,6 +2466,110 @@ function clearPausedState(mode) {
 function clearAllPausedStates() {
   pausedStates = {};
   savePausedStates();
+}
+
+
+// ═══════════════════════════════════════════════
+// RESTAURATION APRÈS RECHARGEMENT NAVIGATEUR
+// ═══════════════════════════════════════════════
+function checkAndRestoreActiveSession() {
+  const activeQuiz = loadActiveQuiz();
+  const activeOral = loadActiveOral();
+
+  if (!activeQuiz && !activeOral) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'restore-modal';
+
+  let btns = '';
+  let msg = '';
+
+  if (activeQuiz && activeOral) {
+    const modeLabels = { all:'Tout mélangé', permisd:'Permis D', memo:'Mémo CTCR', failed:'Questions ratées', revision:'Révision' };
+    msg = `Un quiz <strong>${modeLabels[activeQuiz.mode] || activeQuiz.mode}</strong> (Q${activeQuiz.current+1}/${activeQuiz.questions.length}) et des <strong>Fiches orales</strong> (Fiche ${activeOral.oralCurrent+1}) étaient en cours.`;
+    btns = `<button class="modal-btn primary" onclick="restoreQuizSession()">▶ Reprendre le Quiz</button>
+            <button class="modal-btn primary" onclick="restoreOralSession()">▶ Reprendre les Fiches Orales</button>
+            <button class="modal-btn secondary" onclick="discardSessions()">✕ Ignorer</button>`;
+  } else if (activeQuiz) {
+    const modeLabels = { all:'Tout mélangé', permisd:'Permis D', memo:'Mémo CTCR', failed:'Questions ratées', revision:'Révision' };
+    msg = `Un quiz <strong>${modeLabels[activeQuiz.mode] || activeQuiz.mode}</strong> était en cours — Question ${activeQuiz.current+1}/${activeQuiz.questions.length}.`;
+    btns = `<button class="modal-btn primary" onclick="restoreQuizSession()">▶ Reprendre le quiz</button>
+            <button class="modal-btn secondary" onclick="discardSessions()">✕ Ignorer</button>`;
+  } else {
+    const done = Object.keys(activeOral.oralResults || {}).length;
+    msg = `Des Fiches orales étaient en cours — Fiche ${activeOral.oralCurrent+1}/12 (${done} évaluée${done>1?'s':''}).`;
+    btns = `<button class="modal-btn primary" onclick="restoreOralSession()">▶ Reprendre les fiches orales</button>
+            <button class="modal-btn secondary" onclick="discardSessions()">✕ Ignorer</button>`;
+  }
+
+  modal.innerHTML = `
+    <div class="modal-box">
+      <h3>🔄 Session en cours détectée</h3>
+      <p>${msg}</p>
+      <div class="modal-actions">${btns}</div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function restoreQuizSession() {
+  const m = document.getElementById('restore-modal');
+  if (m) m.remove();
+  const data = loadActiveQuiz();
+  if (!data) return;
+  currentMode = data.mode;
+  questions = data.questions;
+  answers = data.answers;
+  quizResults = data.quizResults;
+  current = data.current;
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('quiz-screen').style.display = 'block';
+  const qTotalEl = document.getElementById('q-total-count');
+  if (qTotalEl) qTotalEl.textContent = questions.length;
+  renderQuestion();
+}
+
+function restoreOralSession() {
+  const m = document.getElementById('restore-modal');
+  if (m) m.remove();
+  const data = loadActiveOral();
+  if (!data) return;
+  // Reconstituer les fiches orales depuis les IDs
+  // oralFiches est peuplé dans startOral — on doit le faire ici aussi
+  const allFiches = typeof ORAL_FICHES !== 'undefined' ? ORAL_FICHES : oralFiches;
+  // Utiliser la liste globale des fiches
+  const ficheById = {};
+  if (typeof ORAL_FICHES_DATA !== 'undefined') {
+    ORAL_FICHES_DATA.forEach(f => ficheById[f.id] = f);
+  }
+  oralCurrent = data.oralCurrent;
+  oralResults = data.oralResults || {};
+  oralSavedInputs = data.oralSavedInputs || {};
+  oralSavedScores = data.oralSavedScores || {};
+  oralRevealed = false;
+  // Si oralFiches est vide, lancer startOral qui va le peupler puis reprendre
+  if (!oralFiches || oralFiches.length === 0) {
+    startOral(true); // force start
+    // Après startOral, restaurer l'état
+    setTimeout(() => {
+      oralCurrent = data.oralCurrent;
+      oralResults = data.oralResults || {};
+      oralSavedInputs = data.oralSavedInputs || {};
+      oralSavedScores = data.oralSavedScores || {};
+      renderOralWithResult();
+    }, 50);
+    return;
+  }
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('oral-screen').style.display = 'block';
+  renderOralWithResult();
+}
+
+function discardSessions() {
+  const m = document.getElementById('restore-modal');
+  if (m) m.remove();
+  clearActiveQuiz();
+  clearActiveOral();
 }
 
 function updateHomeStats() {
@@ -2277,15 +2876,35 @@ function isCorrect(ans, correct, qId) {
     // ── Niveau 4 : mots-clés (≥70% des mots significatifs trouvés) ──
     const cWords = cStrip.split(' ').filter(w => w.length > 2);
     if (cWords.length === 0) {
-      // Réponse très courte (ex: "A", "S", "R", "9h", "45mn")
-      // → comparaison directe normalisée, ou si cNorm est inclus dans aNorm
       return aNorm.includes(cNorm) || cNorm.includes(aNorm);
     }
     const matchCount = cWords.filter(w => aStrip.includes(w)).length;
-    // Seuil plus strict pour les réponses longues (>3 mots clés)
     const threshold = cWords.length > 3 ? 0.8 : 0.7;
-    return matchCount >= Math.ceil(cWords.length * threshold);
+    if (matchCount >= Math.ceil(cWords.length * threshold)) return true;
+
+    // ── Niveau 5 : tolérance fautes d'orthographe (Levenshtein ≤ 2) ──
+    // Chaque mot de la réponse utilisateur est comparé aux mots clés
+    const aWords = aStrip.split(' ').filter(w => w.length > 2);
+    const fuzzyMatch = cWords.filter(cw => {
+      // Mot exact déjà trouvé
+      if (aStrip.includes(cw)) return true;
+      // Chercher un mot proche dans les mots de l'utilisateur
+      return aWords.some(aw => levenshtein(cw, aw) <= Math.max(1, Math.floor(cw.length / 5)));
+    }).length;
+    return fuzzyMatch >= Math.ceil(cWords.length * threshold);
   });
+}
+
+// Distance de Levenshtein (pour la tolérance orthographe)
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_, i) => Array.from({length: n+1}, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
 }
 
 // ═══════════════════════════════════════════════
@@ -2354,6 +2973,79 @@ function getSavedOralState()     { return pausedStates['oral'] || null; }
 // ═══════════════════════════════════════════════
 // REPRENDRE / RECOMMENCER UN QUIZ SAUVEGARDÉ
 // ═══════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════
+// RECOMMENCER UNE FICHE — 2 options
+// ═══════════════════════════════════════════════
+function showRestartFicheModal() {
+  const fiche = oralFiches[oralCurrent];
+  const savedScore = oralSavedScores[fiche.id] || { scorePct: 100 };
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'restart-fiche-options-modal';
+  modal.innerHTML = `
+    <div class="modal-box">
+      <h3>🔄 Recommencer cette fiche ?</h3>
+      <p>Comment veux-tu recommencer <strong>${fiche.num} — ${fiche.title}</strong> ?</p>
+      <div class="modal-actions">
+        <button class="modal-btn primary" onclick="restartFichePartial()">
+          🎯 Seulement les oublis
+          <span style="display:block;font-size:11px;font-weight:400;opacity:0.8;margin-top:2px;">Zones rouges (ratées) et blanches (non remplies)</span>
+        </button>
+        <button class="modal-btn secondary" onclick="restartFicheFull()">
+          📝 Tout recommencer
+          <span style="display:block;font-size:11px;font-weight:400;opacity:0.8;margin-top:2px;">Toutes les zones vides</span>
+        </button>
+        <button class="modal-btn secondary" onclick="document.getElementById('restart-fiche-options-modal').remove()">✕ Annuler</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function restartFicheFull() {
+  const m = document.getElementById('restart-fiche-options-modal');
+  if (m) m.remove();
+  // Tout effacer — recommencer complètement
+  const fiche = oralFiches[oralCurrent];
+  delete oralSavedInputs[fiche.id];
+  delete oralSavedScores[fiche.id];
+  oralRevealed = false;
+  renderOral();
+}
+
+function restartFichePartial() {
+  const m = document.getElementById('restart-fiche-options-modal');
+  if (m) m.remove();
+  const fiche = oralFiches[oralCurrent];
+  // Garder les bonnes réponses (vertes), effacer les mauvaises (rouges) et non remplies (blancs)
+  const savedInputs = oralSavedInputs[fiche.id] || {};
+  const partialInputs = {};
+  fiche.sections.forEach((sec, si) => {
+    sec.subsections.forEach((sub, subi) => {
+      if (sub.bullets.length === 0) return;
+      const userText = savedInputs[si] && savedInputs[si][subi] ? savedInputs[si][subi] : '';
+      if (!userText) return; // blanc → laisser vide
+      // Vérifier si cette sous-section était bien répondue
+      const bNorm = sub.bullets.map(b => b.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+      const uNorm = userText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const keyWords = bNorm.join(' ').split(/\W+/).filter(w => w.length > 3);
+      const found = keyWords.length === 0 || keyWords.filter(w => uNorm.includes(w)).length >= Math.ceil(keyWords.length * 0.5);
+      if (found) {
+        // Bonne réponse → conserver
+        if (!partialInputs[si]) partialInputs[si] = {};
+        partialInputs[si][subi] = userText;
+      }
+      // Mauvaise → laisser vide (sera rouge dans le formulaire)
+    });
+  });
+  // Sauvegarder les réponses partielles et relancer la fiche en mode saisie
+  oralSavedInputs[fiche.id] = partialInputs;
+  delete oralSavedScores[fiche.id];
+  delete oralResults[fiche.id];
+  oralRevealed = false;
+  renderOral(partialInputs); // passer les réponses partielles pour préremplir
+}
 
 function showResumeModal() {
   const s = getSavedQuizState(currentMode);
@@ -2644,6 +3336,10 @@ function renderQuestion() {
   document.getElementById('progress-fill').style.width = pct+'%';
   document.getElementById('btn-back').disabled = current===0;
   document.getElementById('btn-next').textContent = current===totalQ-1 ? 'Voir les résultats →' : 'Suivant →';
+  saveActiveQuiz(); // Sauvegarde continue pour survie au rechargement
+  // Lecture vocale de la question si activée
+  const qText = q.q || '';
+  speakText(qText);
   renderQuizGraph();
 
   let typeLabel, typeBadgeClass;
@@ -2695,9 +3391,10 @@ function addRipple(btn) {
 function selectVF(val,btn) { answers[current]=val; addRipple(btn); document.querySelectorAll('.btn-grid-vf .ans-btn').forEach(b=>b.className='ans-btn'); btn.className='ans-btn sel-'+(val==='Vrai'?'vrai':'faux'); }
 function selectOUN(val,btn) { answers[current]=val; addRipple(btn); document.querySelectorAll('.btn-grid-oun .ans-btn').forEach(b=>b.className='ans-btn'); btn.className='ans-btn sel-'+(val==='Oui'?'oui':'non'); }
 function setOpen(val) { answers[current]=val; }
-function goBack() { if(current>0){current--;renderQuestion();} }
+function goBack() { if(current>0){ stopTTS(); current--; renderQuestion(); } }
 
 function goNext() {
+  stopTTS(); // Couper lecture avant de passer à la suivante
   const q = questions[current];
   if (q.type!=='open' && !answers[current]) {
     const area = document.getElementById('answers-area');
@@ -2716,6 +3413,7 @@ function showResults() {
   const items = questions.map((q,i)=>{ const ok=isCorrect(answers[i],q.correct,q.id); if(ok)score++; quizResults[i]=ok; return{q,ans:answers[i],ok}; });
   recordResults(items.map(item=>({id:item.q.id,correct:item.ok})), currentMode);
   clearPausedState(currentMode); // Quiz terminé normalement
+  clearActiveQuiz();
   const totalQ = questions.length;
   const pct=Math.round(score/totalQ*100);
   const cls=pct>=80?'great':pct>=60?'ok':'bad';
@@ -2729,6 +3427,12 @@ function showResults() {
   const statsAfter=loadStats();
   const masteredAfter=Object.keys(statsAfter.mastered).length;
   const masteredPct=Math.round(masteredAfter/TOTAL*100);
+  // Total de questions du mode courant (pour afficher X/total_mode)
+  const modePool = getQuestionsForMode(currentMode);
+  const modeTotal = modePool.length || TOTAL;
+  // Maîtrisées dans ce mode spécifiquement
+  const masteredInMode = modePool.filter(q => statsAfter.mastered && statsAfter.mastered[q.id]).length;
+  const masteredModePct = Math.round(masteredInMode / modeTotal * 100);
   // Stats cumulées du mode — affichées EN PREMIER (au-dessus du score)
   const msCumul = (statsAfter.modeStats || {})[currentMode] || { correct: 0, wrong: 0 };
   const msCumulTot = msCumul.correct + msCumul.wrong;
@@ -2741,15 +3445,19 @@ function showResults() {
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;color:${msCumulColor}">${msCumulPct}%</div>
       <div style="font-size:12px;color:var(--muted)"><span style="color:#22c55e">${msCumul.correct}✓</span> · <span style="color:#ef4444">${msCumul.wrong}✗</span> sur ${msCumulTot} réponses</div>
     </div>` : '';
-  let html=`${statsCumulHtml}<div class="score-card ${cls}"><div class="score-emoji">${emoji}</div><div class="score-num">${score}/${totalQ}</div><div class="score-label">${pct}% de bonnes réponses</div>${segHtml}${wrongNote}<div style="margin-top:12px;padding-top:10px;border-top:1px solid #2a2a3a;font-size:13px;color:#7070a0;">Progression : <strong style="color:#22c55e">${masteredAfter}</strong>/<strong style="color:#e8e8f0">${TOTAL}</strong> maîtrisées (<strong style="color:#5b8aff">${masteredPct}%</strong>)</div><div class="score-msg">${msg}</div></div><div class="results-list">`;
+  let html=`${statsCumulHtml}<div class="score-card ${cls}"><div class="score-emoji">${emoji}</div><div class="score-num">${score}/${totalQ}</div><div class="score-label">${pct}% de bonnes réponses</div>${segHtml}${wrongNote}<div style="margin-top:12px;padding-top:10px;border-top:1px solid #2a2a3a;font-size:13px;color:#7070a0;">
+        Dans ce mode : <strong style="color:#22c55e">${masteredInMode}</strong>/<strong style="color:#e8e8f0">${modeTotal}</strong> maîtrisées (<strong style="color:#5b8aff">${masteredModePct}%</strong>)
+        <span style="color:#3a3a5a;margin:0 6px">·</span>
+        Total global : <strong style="color:#22c55e">${masteredAfter}</strong>/<strong style="color:#e8e8f0">${TOTAL}</strong>
+      </div><div class="score-msg">${msg}</div></div><div class="results-list">`;
   items.forEach((item,i)=>{
     const hasPanneau=item.q.panneau&&PANNEAUX[item.q.panneau];
     html+=`<div class="result-item ${item.ok?'correct':'wrong'}" style="animation-delay:${i*0.07}s"><div class="ri-header"><span class="ri-num">Q${i+1}·F${item.q.f}</span><span class="ri-q">${item.q.q}</span><span class="ri-icon">${item.ok?'✓':'✗'}</span></div>${hasPanneau?`<div class="ri-panneau">${PANNEAUX[item.q.panneau]}</div>`:''}<div class="ri-answers">${!item.ok?`<div class="ri-your">Ta réponse : ${item.ans||'(vide)'}</div>`:''}<div class="ri-correct">✓ Bonne réponse : ${item.q.correct}</div></div></div>`;
   });
   // Stats du mode actuel
   const modeStatsCurrent = (loadStats().modeStats || {})[currentMode] || { correct: 0, wrong: 0 };
-  const modeTotal = modeStatsCurrent.correct + modeStatsCurrent.wrong;
-  const modePct = modeTotal > 0 ? Math.round(modeStatsCurrent.correct / modeTotal * 100) : 0;
+  const modeTotalAnswered = modeStatsCurrent.correct + modeStatsCurrent.wrong;
+  const modePct = modeTotalAnswered > 0 ? Math.round(modeStatsCurrent.correct / modeTotalAnswered * 100) : 0;
   const modeLabel = { all: 'Tout mélangé', permisd: 'Permis D', memo: 'Mémo CTCR', failed: 'Questions ratées', revision: 'Révision' }[currentMode] || currentMode;
   html+=`</div>
   <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:12px;">
@@ -3211,7 +3919,7 @@ function buildFicheCorrectHTML(fiche, inputValues) {
   return html;
 }
 
-function renderOral() {
+function renderOral(prefillInputs) {
   if (oralCurrent >= oralFiches.length) { showOralResults(); return; }
   const fiche = oralFiches[oralCurrent];
   const stats = loadOralStats();
@@ -3241,7 +3949,21 @@ function renderOral() {
     ${buildFicheInputHTML(fiche)}
   `;
 
+  // Préremplir les textareas si des réponses partielles existent (mode "seulement les oublis")
+  if (prefillInputs && Object.keys(prefillInputs).length > 0) {
+    document.querySelectorAll('#oral-card-area .oral-textarea').forEach(ta => {
+      const si = parseInt(ta.dataset.si), subi = parseInt(ta.dataset.subi);
+      if (prefillInputs[si] && prefillInputs[si][subi]) {
+        ta.value = prefillInputs[si][subi];
+        ta.style.borderColor = 'var(--green-light)';
+      }
+    });
+  }
+
   updateOralNavButtons('blank');
+  saveActiveOral(); // Sauvegarde continue pour survie au rechargement
+  // Lecture vocale du titre de la fiche
+  speakText(fiche.num + ' — ' + fiche.title);
 }
 
 function revealOral() {
@@ -3290,7 +4012,7 @@ function revealOral() {
         <button class="oral-eval-btn fail" onclick="oralEval(false)">✗ Pas encore</button>
         <button class="oral-eval-btn ok" onclick="oralEval(true)">✓ Oui, maîtrisé !</button>
       </div>
-      <button style="width:100%;margin-top:10px;padding:11px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;" onclick="restartCurrentFiche()">🔄 Recommencer cette fiche</button>
+      <button style="width:100%;margin-top:10px;padding:11px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;" onclick="showRestartFicheModal()">🔄 Recommencer cette fiche</button>
     </div>
   `;
 
@@ -3379,6 +4101,7 @@ function doRestartCurrentFiche() {
 
 function oralBack() {
   if (oralCurrent > 0) {
+    stopTTS();
     oralCurrent--;
     renderOralWithResult();
   }
@@ -3386,6 +4109,7 @@ function oralBack() {
 
 function oralForward() {
   if (oralCurrent < oralFiches.length - 1) {
+    stopTTS();
     oralCurrent++;
     renderOralWithResult();
   }
@@ -3478,7 +4202,7 @@ function renderOralRevealed(fiche) {
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-top:12px;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:${scoreColor};text-align:center;margin-bottom:6px;">${scorePct}% <span style="font-size:13px;font-weight:600;color:var(--muted)">(${foundBullets}/${totalBullets} points)</span></div>
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">✓ Vert = mentionné · ✗ Rouge = oublié · Blanc = non renseigné</div>
-      <button style="width:100%;padding:11px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;" onclick="restartCurrentFicheConfirm()">🔄 Recommencer cette fiche</button>
+      <button style="width:100%;padding:11px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;" onclick="showRestartFicheModal()">🔄 Recommencer cette fiche</button>
     </div>`;
 
   // Mettre à jour les boutons de nav du bas
@@ -3498,6 +4222,7 @@ function showOralResults() {
   oralStats.failedLast = failedIds;
   saveOralStats(oralStats);
   clearPausedState('oral'); // Fiches orales terminées
+  clearActiveOral();
 
   const total = oralFiches.length;
   const okCount = oralFiches.filter(f => oralResults[f.id] === true).length;
