@@ -699,7 +699,7 @@
       <h1>Quiz Permis D</h1>
       <p>CATÉGORIE D — TRANSPORT EN COMMUN</p>
     </div>
-    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 27</div>
+    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 28</div>
   </div>
 
   <!-- HOME -->
@@ -1740,7 +1740,7 @@ const TOTAL = ALL_QUESTIONS.length;
 //   quizCount: number
 // ═══════════════════════════════════════════════
 
-const APP_VERSION = 'v27'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
+const APP_VERSION = 'v28'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
 
 function loadStats() {
   try {
@@ -2392,7 +2392,15 @@ function loadActiveOral() {
   try {
     const s = localStorage.getItem(ACTIVE_ORAL_KEY);
     if (!s) return null;
-    return JSON.parse(s);
+    const data = JSON.parse(s);
+    if (!data || typeof data !== 'object') return null;
+    // Valider la structure minimale
+    if (!Array.isArray(data.ficheIds) || data.ficheIds.length === 0) return null;
+    if (typeof data.oralCurrent !== 'number') data.oralCurrent = 0;
+    if (!data.oralResults) data.oralResults = {};
+    if (!data.oralSavedInputs) data.oralSavedInputs = {};
+    if (!data.oralSavedScores) data.oralSavedScores = {};
+    return data;
   } catch(e) { return null; }
 }
 
@@ -2405,21 +2413,33 @@ function savePausedStates() {
 function loadPausedStates() {
   try {
     const s = localStorage.getItem(PAUSED_KEY);
-    if (s) {
-      pausedStates = JSON.parse(s);
-      // Convertir les tableaux de questions (objets simples) en références vers ALL_QUESTIONS
-      // pour éviter les données corrompues
-      ['all','permisd','memo','failed','revision'].forEach(mode => {
-        const st = pausedStates[mode];
-        if (st && st.questions) {
-          // Reconstituer les questions depuis ALL_QUESTIONS par id
-          const byId = {};
-          ALL_QUESTIONS.forEach(q => byId[q.id] = q);
-          st.questions = st.questions.map(q => byId[q.id] || q).filter(Boolean);
-        }
-      });
+    if (!s) return;
+    const parsed = JSON.parse(s);
+    if (typeof parsed !== 'object' || parsed === null) return;
+    // Reconstituer les questions depuis ALL_QUESTIONS par id (données légères)
+    const byId = {};
+    ALL_QUESTIONS.forEach(q => byId[q.id] = q);
+    ['all','permisd','memo','failed','revision'].forEach(mode => {
+      const st = parsed[mode];
+      if (st && Array.isArray(st.questions)) {
+        st.questions = st.questions.map(q => byId[q.id] || q).filter(Boolean);
+        if (st.questions.length === 0) { delete parsed[mode]; return; }
+        // S'assurer que answers et quizResults ont la bonne taille
+        if (!Array.isArray(st.answers)) st.answers = new Array(st.questions.length).fill(null);
+        if (!Array.isArray(st.quizResults)) st.quizResults = new Array(st.questions.length).fill(null);
+      }
+    });
+    // Oral
+    if (parsed['oral'] && parsed['oral'].oralFiches) {
+      if (!parsed['oral'].oralResults) parsed['oral'].oralResults = {};
+      if (!parsed['oral'].oralSavedInputs) parsed['oral'].oralSavedInputs = {};
+      if (!parsed['oral'].oralSavedScores) parsed['oral'].oralSavedScores = {};
     }
-  } catch(e) { pausedStates = {}; }
+    pausedStates = parsed;
+  } catch(e) {
+    console.warn('loadPausedStates error (données conservées):', e);
+    // Ne pas effacer — laisser pausedStates = {}
+  }
 }
 
 function clearPausedState(mode) {
@@ -4278,6 +4298,27 @@ function renderOralRevealed(fiche) {
 
 function oralNext() { } // géré dynamiquement
 
+
+// ═══════════════════════════════════════════════
+// ACCORDION RÉSULTATS ORAUX — un seul ouvert à la fois
+// ═══════════════════════════════════════════════
+function toggleOralAccordion(idx) {
+  const total = oralFiches.length;
+  for (let i = 0; i < total; i++) {
+    const body = document.getElementById('oral-acc-body-' + i);
+    const arr  = document.querySelector('#oral-acc-' + i + ' .oral-acc-arr');
+    if (!body) continue;
+    if (i === idx) {
+      const isOpen = body.style.display !== 'none';
+      body.style.display = isOpen ? 'none' : 'block';
+      if (arr) arr.textContent = isOpen ? '▼' : '▲';
+    } else {
+      body.style.display = 'none';
+      if (arr) arr.textContent = '▼';
+    }
+  }
+}
+
 function showOralResults() {
   document.getElementById('oral-screen').style.display = 'none';
   const rs = document.getElementById('oral-results-screen');
@@ -4322,7 +4363,20 @@ function showOralResults() {
     const ok = oralResults[fiche.id];
     const cls2 = ok === true ? 'correct' : ok === false ? 'wrong' : '';
     const icon = ok === true ? '✓' : ok === false ? '✗' : '—';
-    html += `<div class="result-item ${cls2}" style="animation-delay:${i*0.06}s"><div class="ri-header"><span class="ri-num">${fiche.num}</span><span class="ri-q">${fiche.title}</span><span class="ri-icon">${icon}</span></div></div>`;
+    const iconColor = ok === true ? '#22c55e' : ok === false ? '#ef4444' : 'var(--muted)';
+    // Chaque fiche est un accordion dépliable
+    html += `<div class="result-item ${cls2} oral-result-accordion" id="oral-acc-${i}" style="animation-delay:${i*0.06}s">
+      <div class="ri-header" onclick="toggleOralAccordion(${i})" style="cursor:pointer;user-select:none;">
+        <span class="ri-num">${fiche.num}</span>
+        <span class="ri-q">${fiche.title}</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span style="color:${iconColor};font-weight:700;">${icon}</span>
+          <span class="oral-acc-arr" style="font-size:10px;color:var(--muted);">▼</span>
+        </span>
+      </div>
+      <div class="oral-acc-body" id="oral-acc-body-${i}" style="display:none;padding:10px 0 4px;border-top:1px solid var(--border);margin-top:8px;">
+      </div>
+    </div>`;
   });
 
   html += `</div>
@@ -4331,6 +4385,28 @@ function showOralResults() {
     <button class="btn-home" onclick="goHome()">← Retour à l'accueil</button>
   `;
   rs.innerHTML = html;
+
+  // Peupler les corps des accordions avec le corrigé de chaque fiche
+  oralFiches.forEach((fiche, i) => {
+    const body = document.getElementById('oral-acc-body-' + i);
+    if (!body) return;
+    const savedInputs = oralSavedInputs[fiche.id] || {};
+    const savedScore = oralSavedScores[fiche.id] || { scorePct: 0, foundBullets: 0, totalBullets: 0 };
+    const { scorePct, foundBullets, totalBullets } = savedScore;
+    const scoreColor = scorePct >= 80 ? '#22c55e' : scorePct >= 50 ? '#f59e0b' : '#ef4444';
+    // Score de la fiche
+    const scoreDiv = document.createElement('div');
+    scoreDiv.style.cssText = 'text-align:center;padding:8px 0 10px;font-family:"Barlow Condensed",sans-serif;';
+    scoreDiv.innerHTML = totalBullets > 0
+      ? '<span style="font-size:20px;font-weight:800;color:' + scoreColor + '">' + scorePct + '%</span>' +
+        '<span style="font-size:12px;color:var(--muted);margin-left:6px;">(' + foundBullets + '/' + totalBullets + ' points)</span>'
+      : '<span style="font-size:12px;color:var(--muted);">Non évaluée</span>';
+    body.appendChild(scoreDiv);
+    // Corrigé complet
+    const correctDiv = document.createElement('div');
+    correctDiv.innerHTML = buildFicheCorrectHTML(fiche, savedInputs);
+    body.appendChild(correctDiv);
+  });
 
   // Afficher les stats cumulées mode oral
   const oralCumulEl = document.getElementById('oral-cumul-stats');
