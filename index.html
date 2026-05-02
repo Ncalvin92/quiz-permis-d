@@ -699,7 +699,7 @@
       <h1>Quiz Permis D</h1>
       <p>CATÉGORIE D — TRANSPORT EN COMMUN</p>
     </div>
-    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 28</div>
+    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 29</div>
   </div>
 
   <!-- HOME -->
@@ -797,6 +797,7 @@
       </button>
     </div>
 
+    <button onclick="showHistory()" style="width:100%;padding:12px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">📋 Historique des quiz</button>
     <button class="btn-reset-stats" onclick="resetStats()">🗑 Réinitialiser toute la progression</button>
     <div id="mode-reset-section" style="margin-top:8px;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Réinitialiser les stats d'un mode :</div>
@@ -1740,7 +1741,7 @@ const TOTAL = ALL_QUESTIONS.length;
 //   quizCount: number
 // ═══════════════════════════════════════════════
 
-const APP_VERSION = 'v28'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
+const APP_VERSION = 'v29'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
 
 function loadStats() {
   try {
@@ -2950,6 +2951,74 @@ function getQuestionsForMode(mode) {
   return ALL_QUESTIONS;
 }
 
+
+// ═══════════════════════════════════════════════
+// HISTORIQUE DES QUIZ TERMINÉS
+// ═══════════════════════════════════════════════
+const HISTORY_KEY = 'permisD_history';
+const MAX_HISTORY = 20;
+
+function saveQuizToHistory(items, mode, score, total) {
+  try {
+    const history = loadHistory();
+    const entry = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
+      mode,
+      score,
+      total,
+      pct: Math.round(score / total * 100),
+      items: items.map(item => ({
+        qId: item.q.id,
+        qText: item.q.q,
+        qFiche: item.q.f,
+        ans: item.ans || '',
+        ok: item.ok,
+        correct: item.q.correct,
+        panneau: item.q.panneau || null,
+      }))
+    };
+    history.unshift(entry); // plus récent en premier
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch(e) {}
+}
+
+function saveOralToHistory(fiches, results, savedInputs, savedScores) {
+  try {
+    const history = loadHistory();
+    const okCount = fiches.filter(f => results[f.id] === true).length;
+    const entry = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
+      mode: 'oral',
+      score: okCount,
+      total: fiches.length,
+      pct: Math.round(okCount / fiches.length * 100),
+      oralItems: fiches.map(f => ({
+        ficheId: f.id,
+        ficheNum: f.num,
+        ficheTitle: f.title,
+        ok: results[f.id],
+        scorePct: (savedScores[f.id] || {}).scorePct || 0,
+        foundBullets: (savedScores[f.id] || {}).foundBullets || 0,
+        totalBullets: (savedScores[f.id] || {}).totalBullets || 0,
+        savedInputs: savedInputs[f.id] || {},
+      }))
+    };
+    history.unshift(entry);
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch(e) {}
+}
+
+function loadHistory() {
+  try {
+    const s = localStorage.getItem(HISTORY_KEY);
+    return s ? JSON.parse(s) : [];
+  } catch(e) { return []; }
+}
+
 // ═══════════════════════════════════════════════
 // QUIZ LOGIC
 // ═══════════════════════════════════════════════
@@ -3398,7 +3467,109 @@ function goNext() {
     return;
   }
   quizResults[current] = isCorrect(answers[current], q.correct, q.id);
+  saveActiveQuiz(); // Sauvegarder après chaque réponse validée
   if (current<questions.length-1) { current++; renderQuestion(); } else { showResults(); }
+}
+
+
+// ═══════════════════════════════════════════════
+// AFFICHAGE HISTORIQUE
+// ═══════════════════════════════════════════════
+function showHistory() {
+  const history = loadHistory();
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'history-modal';
+  modal.style.cssText = 'overflow-y:auto;align-items:flex-start;padding:16px 12px;';
+
+  const modeLabels = { all:'🎯 Tout mélangé', permisd:'🚌 Permis D', memo:'📋 Mémo CTCR',
+    failed:'⚡ Questions ratées', revision:'📖 Révision', oral:'🎤 Fiches Orales' };
+
+  if (history.length === 0) {
+    modal.innerHTML = '<div class="modal-box"><h3>📋 Historique</h3><p style="color:var(--muted)">Aucun quiz terminé pour l\'instant.</p><button class="modal-btn secondary" onclick="document.getElementById(\'history-modal\').remove()">✕ Fermer</button></div>';
+    document.body.appendChild(modal);
+    return;
+  }
+
+  const container = document.createElement('div');
+  container.style.cssText = 'max-width:500px;width:100%;margin:0 auto;';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;';
+  header.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:800;color:var(--text);">📋 Historique (' + history.length + ' quiz)</div>' +
+    '<button onclick="document.getElementById(\'history-modal\').remove()" style="background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);padding:6px 12px;cursor:pointer;">✕</button>';
+  container.appendChild(header);
+
+  history.forEach((entry, idx) => {
+    const col = entry.pct >= 80 ? '#22c55e' : entry.pct >= 50 ? '#f59e0b' : '#ef4444';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;';
+
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;';
+    topRow.innerHTML = '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:700;color:var(--text);">' + (modeLabels[entry.mode] || entry.mode) + '</span>' +
+      '<span style="font-size:11px;color:var(--muted);">' + entry.date + '</span>';
+    card.appendChild(topRow);
+
+    const scoreRow = document.createElement('div');
+    scoreRow.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:8px;';
+    scoreRow.innerHTML = '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:24px;font-weight:800;color:' + col + '">' + entry.pct + '%</span>' +
+      '<span style="font-size:13px;color:var(--muted);"><span style=\"color:#22c55e\">' + entry.score + '✓</span> / <span style=\"color:#ef4444\">' + (entry.total - entry.score) + '✗</span> sur ' + entry.total + '</span>';
+    card.appendChild(scoreRow);
+
+    // Détails dépliables
+    const detailId = 'hist-detail-' + idx;
+    const detailDiv = document.createElement('div');
+    detailDiv.id = detailId;
+    detailDiv.style.display = 'none';
+    detailDiv.style.marginTop = '8px';
+    detailDiv.style.borderTop = '1px solid var(--border)';
+    detailDiv.style.paddingTop = '8px';
+
+    if (entry.mode === 'oral' && entry.oralItems) {
+      entry.oralItems.forEach(item => {
+        const ic = item.ok === true ? '#22c55e' : item.ok === false ? '#ef4444' : 'var(--muted)';
+        const icon = item.ok === true ? '✓' : item.ok === false ? '✗' : '—';
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);';
+        row.innerHTML = '<span style="color:var(--muted);">' + item.ficheNum + '</span>' +
+          '<span style="flex:1;margin:0 8px;color:var(--text);">' + item.ficheTitle + '</span>' +
+          '<span style="color:' + ic + ';font-weight:700;">' + icon + ' ' + item.scorePct + '%</span>';
+        detailDiv.appendChild(row);
+      });
+    } else if (entry.items) {
+      entry.items.forEach(item => {
+        const ic = item.ok ? '#22c55e' : '#ef4444';
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;';
+        let html = '<div style="display:flex;align-items:flex-start;gap:6px;"><span style="color:' + ic + ';font-weight:700;flex-shrink:0;">' + (item.ok ? '✓' : '✗') + '</span><span style="color:var(--text);flex:1;">' + item.qText + '</span></div>';
+        if (!item.ok) html += '<div style="font-size:11px;color:var(--muted);margin-top:3px;padding-left:16px;">Ta réponse : <em>' + (item.ans||'(vide)') + '</em> · Bonne : <span style=\"color:#22c55e\">' + item.correct + '</span></div>';
+        row.innerHTML = html;
+        detailDiv.appendChild(row);
+      });
+    }
+    card.appendChild(detailDiv);
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = '▼ Voir les détails';
+    toggleBtn.style.cssText = 'margin-top:8px;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);padding:6px 12px;cursor:pointer;font-size:12px;width:100%;';
+    toggleBtn.addEventListener('click', () => {
+      const open = detailDiv.style.display !== 'none';
+      detailDiv.style.display = open ? 'none' : 'block';
+      toggleBtn.textContent = open ? '▼ Voir les détails' : '▲ Masquer';
+    });
+    card.appendChild(toggleBtn);
+    container.appendChild(card);
+  });
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕ Fermer';
+  closeBtn.style.cssText = 'width:100%;margin-top:8px;padding:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;cursor:pointer;';
+  closeBtn.onclick = () => modal.remove();
+  container.appendChild(closeBtn);
+
+  modal.appendChild(container);
+  document.body.appendChild(modal);
 }
 
 function showResults() {
@@ -3408,6 +3579,7 @@ function showResults() {
   let score=0;
   const items = questions.map((q,i)=>{ const ok=isCorrect(answers[i],q.correct,q.id); if(ok)score++; quizResults[i]=ok; return{q,ans:answers[i],ok}; });
   recordResults(items.map(item=>({id:item.q.id,correct:item.ok})), currentMode);
+  saveQuizToHistory(items, currentMode, score, totalQ); // Sauvegarder dans l'historique
   clearPausedState(currentMode); // Quiz terminé normalement
   clearActiveQuiz();
   const totalQ = questions.length;
@@ -3461,7 +3633,9 @@ function showResults() {
     <div style="font-size:22px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:${modePct>=80?'#22c55e':modePct>=50?'#f59e0b':'#ef4444'}">${modePct}%</div>
     <div style="font-size:12px;color:var(--muted)">${modeStatsCurrent.correct} bonnes · ${modeStatsCurrent.wrong} mauvaises sur ${modeTotal} réponses</div>
   </div>
-  <button class="btn-restart" onclick="startQuiz()">🔄 Nouveau quiz</button><button class="btn-home" onclick="goHome()">← Retour à l'accueil</button>`;
+  <button class="btn-restart" onclick="startQuiz()">🔄 Nouveau quiz</button>
+  <button style="width:100%;padding:13px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;" onclick="showHistory()">📋 Voir l'historique</button>
+  <button class="btn-home" onclick="goHome()">← Retour à l'accueil</button>`;
   rs.innerHTML=html;
   stopTTS();
   ttsLastText = ''; // Quiz terminé — effacer le texte mémorisé
@@ -4329,6 +4503,7 @@ function showOralResults() {
   const failedIds = oralFiches.filter(f => oralResults[f.id] === false).map(f => f.id);
   oralStats.failedLast = failedIds;
   saveOralStats(oralStats);
+  saveOralToHistory(oralFiches, oralResults, oralSavedInputs, oralSavedScores);
   clearPausedState('oral'); // Fiches orales terminées
   clearActiveOral();
 
@@ -4382,6 +4557,7 @@ function showOralResults() {
   html += `</div>
     <div id="oral-cumul-stats"></div>
     <button class="btn-restart" onclick="restartOralFromResults()">🔄 Recommencer les fiches orales</button>
+    <button style="width:100%;padding:13px;background:transparent;color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;" onclick="showHistory()">📋 Voir l'historique</button>
     <button class="btn-home" onclick="goHome()">← Retour à l'accueil</button>
   `;
   rs.innerHTML = html;
