@@ -699,7 +699,7 @@
       <h1>Quiz Permis D</h1>
       <p>CATÉGORIE D — TRANSPORT EN COMMUN</p>
     </div>
-    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 30</div>
+    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 31</div>
   </div>
 
   <!-- HOME -->
@@ -1741,7 +1741,7 @@ const TOTAL = ALL_QUESTIONS.length;
 //   quizCount: number
 // ═══════════════════════════════════════════════
 
-const APP_VERSION = 'v30'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
+const APP_VERSION = 'v31'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
 
 function loadStats() {
   try {
@@ -1800,24 +1800,9 @@ function doResetStats() {
   localStorage.removeItem('permisD_stats_v2');
   localStorage.removeItem('permisD_stats');
   localStorage.removeItem('permisD_oral_stats');
-  // Les quiz en pause sont conservés intentionnellement
-  document.querySelectorAll('.memo-body.show').forEach(el => {
-    el.style.display = 'block';
-    const title = el.previousElementSibling;
-    if (title) {
-      const arr = title.querySelector('.arr');
-      if (arr) arr.textContent = '▲';
-    }
-  });
-  // Charger les quiz en pause (persistants entre sessions et versions)
-  loadPausedStates();
-  loadTTSPref();
-  loadUIPrefs();
-  loadELConfig();
-  // Détecter si un quiz était en cours lors du rechargement
-  checkAndRestoreActiveSession();
   updateHomeStats();
 }
+
 
 function resetAllIncludingPaused() {
   doResetStats();
@@ -4759,7 +4744,11 @@ const dynStyle = document.createElement('style');
 dynStyle.textContent = `@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}`;
 document.head.appendChild(dynStyle);
 
-// Init aide-mémoire : si class "show", afficher
+// ═══════════════════════════════════════════════
+// INITIALISATION AU CHARGEMENT DE LA PAGE
+// ═══════════════════════════════════════════════
+
+// Init aide-mémoire (replié par défaut)
 document.querySelectorAll('.memo-body.show').forEach(el => {
   el.style.display = 'block';
   const title = el.previousElementSibling;
@@ -4768,6 +4757,20 @@ document.querySelectorAll('.memo-body.show').forEach(el => {
     if (arr) arr.textContent = '▲';
   }
 });
+
+// Charger les préférences UI (barres de progression, TTS)
+loadTTSPref();
+loadUIPrefs();
+loadELConfig();
+
+// Charger les quiz/fiches orales en pause + sessions actives
+// DOIT être après ORAL_FICHES et ALL_QUESTIONS (définis plus haut dans le script)
+loadPausedStates();
+
+// Proposer de reprendre si session en cours détectée
+checkAndRestoreActiveSession();
+
+// Mettre à jour l'accueil
 updateHomeStats();
 </script>
 </body>
