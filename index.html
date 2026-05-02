@@ -699,7 +699,7 @@
       <h1>Quiz Permis D</h1>
       <p>CATÉGORIE D — TRANSPORT EN COMMUN</p>
     </div>
-    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 29</div>
+    <div style="margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.05em;background:rgba(61,111,255,0.15);border:1px solid rgba(61,111,255,0.3);border-radius:6px;padding:4px 10px;color:var(--accent2);">V 30</div>
   </div>
 
   <!-- HOME -->
@@ -1741,7 +1741,7 @@ const TOTAL = ALL_QUESTIONS.length;
 //   quizCount: number
 // ═══════════════════════════════════════════════
 
-const APP_VERSION = 'v29'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
+const APP_VERSION = 'v30'; // Jamais de reset auto — uniquement pour info // Changer à chaque mise à jour pour reset les stats
 
 function loadStats() {
   try {
@@ -1812,6 +1812,7 @@ function doResetStats() {
   // Charger les quiz en pause (persistants entre sessions et versions)
   loadPausedStates();
   loadTTSPref();
+  loadUIPrefs();
   loadELConfig();
   // Détecter si un quiz était en cours lors du rechargement
   checkAndRestoreActiveSession();
@@ -1876,6 +1877,7 @@ function toggleTTS(cb) {
     if (el) el.checked = ttsEnabled;
   });
   try { localStorage.setItem('permisD_tts', ttsEnabled ? '1' : '0'); } catch(e) {}
+  saveUIPrefs();
 
   if (!ttsEnabled) {
     stopTTS();
@@ -1927,6 +1929,49 @@ function loadELConfig() {
       ELEVENLABS_VOICE_ID = voice;
       const sel = document.getElementById('el-voice-select');
       if (sel) sel.value = voice;
+    }
+  } catch(e) {}
+}
+
+
+// ═══════════════════════════════════════════════
+// PRÉFÉRENCES UI — persistantes entre sessions
+// ═══════════════════════════════════════════════
+const PREFS_KEY = 'permisD_prefs';
+
+function saveUIPrefs() {
+  try {
+    const quizGraph = document.getElementById('quiz-graph-toggle');
+    const oralGraph = document.getElementById('oral-graph-toggle');
+    const prefs = {
+      quizGraph: quizGraph ? quizGraph.checked : false,
+      oralGraph: oralGraph ? oralGraph.checked : false,
+      tts: ttsEnabled,
+    };
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch(e) {}
+}
+
+function loadUIPrefs() {
+  try {
+    const s = localStorage.getItem(PREFS_KEY);
+    if (!s) return;
+    const prefs = JSON.parse(s);
+
+    // Barres de progression quiz
+    const quizGraphEl = document.getElementById('quiz-graph-toggle');
+    const quizGraphDiv = document.getElementById('quiz-graph');
+    if (quizGraphEl && prefs.quizGraph !== undefined) {
+      quizGraphEl.checked = prefs.quizGraph;
+      if (quizGraphDiv) quizGraphDiv.classList.toggle('hidden', !prefs.quizGraph);
+    }
+
+    // Barres de progression oral
+    const oralGraphEl = document.getElementById('oral-graph-toggle');
+    const oralGraphDiv = document.getElementById('oral-graph');
+    if (oralGraphEl && prefs.oralGraph !== undefined) {
+      oralGraphEl.checked = prefs.oralGraph;
+      if (oralGraphDiv) oralGraphDiv.classList.toggle('hidden', !prefs.oralGraph);
     }
   } catch(e) {}
 }
@@ -2412,35 +2457,77 @@ function savePausedStates() {
 }
 
 function loadPausedStates() {
+  const byId = {};
+  ALL_QUESTIONS.forEach(q => byId[q.id] = q);
+
+  // 1. Charger pausedStates depuis PAUSED_KEY
   try {
     const s = localStorage.getItem(PAUSED_KEY);
-    if (!s) return;
-    const parsed = JSON.parse(s);
-    if (typeof parsed !== 'object' || parsed === null) return;
-    // Reconstituer les questions depuis ALL_QUESTIONS par id (données légères)
-    const byId = {};
-    ALL_QUESTIONS.forEach(q => byId[q.id] = q);
-    ['all','permisd','memo','failed','revision'].forEach(mode => {
-      const st = parsed[mode];
-      if (st && Array.isArray(st.questions)) {
-        st.questions = st.questions.map(q => byId[q.id] || q).filter(Boolean);
-        if (st.questions.length === 0) { delete parsed[mode]; return; }
-        // S'assurer que answers et quizResults ont la bonne taille
-        if (!Array.isArray(st.answers)) st.answers = new Array(st.questions.length).fill(null);
-        if (!Array.isArray(st.quizResults)) st.quizResults = new Array(st.questions.length).fill(null);
+    if (s) {
+      const parsed = JSON.parse(s);
+      if (typeof parsed === 'object' && parsed !== null) {
+        ['all','permisd','memo','failed','revision'].forEach(mode => {
+          const st = parsed[mode];
+          if (st && Array.isArray(st.questions)) {
+            st.questions = st.questions.map(q => byId[q.id] || q).filter(Boolean);
+            if (st.questions.length === 0) { delete parsed[mode]; return; }
+            if (!Array.isArray(st.answers)) st.answers = new Array(st.questions.length).fill(null);
+            if (!Array.isArray(st.quizResults)) st.quizResults = new Array(st.questions.length).fill(null);
+          }
+        });
+        if (parsed['oral'] && parsed['oral'].oralFiches) {
+          if (!parsed['oral'].oralResults) parsed['oral'].oralResults = {};
+          if (!parsed['oral'].oralSavedInputs) parsed['oral'].oralSavedInputs = {};
+          if (!parsed['oral'].oralSavedScores) parsed['oral'].oralSavedScores = {};
+        }
+        pausedStates = parsed;
       }
-    });
-    // Oral
-    if (parsed['oral'] && parsed['oral'].oralFiches) {
-      if (!parsed['oral'].oralResults) parsed['oral'].oralResults = {};
-      if (!parsed['oral'].oralSavedInputs) parsed['oral'].oralSavedInputs = {};
-      if (!parsed['oral'].oralSavedScores) parsed['oral'].oralSavedScores = {};
     }
-    pausedStates = parsed;
-  } catch(e) {
-    console.warn('loadPausedStates error (données conservées):', e);
-    // Ne pas effacer — laisser pausedStates = {}
-  }
+  } catch(e) { console.warn('loadPausedStates error:', e); }
+
+  // 2. Fusionner avec ACTIVE_ORAL_KEY (session orale en cours)
+  //    Si plus récent ou absent dans pausedStates → l'utiliser
+  try {
+    const oa = localStorage.getItem(ACTIVE_ORAL_KEY);
+    if (oa) {
+      const oaData = JSON.parse(oa);
+      if (oaData && Array.isArray(oaData.ficheIds) && oaData.ficheIds.length > 0) {
+        // Reconstituer oralFiches depuis ORAL_FICHES
+        const ficheById = {};
+        ORAL_FICHES.forEach(f => ficheById[f.id] = f);
+        const fiches = oaData.ficheIds.map(id => ficheById[id]).filter(Boolean);
+        if (fiches.length > 0 && !pausedStates['oral']) {
+          pausedStates['oral'] = {
+            oralFiches: fiches,
+            oralCurrent: oaData.oralCurrent || 0,
+            oralResults: oaData.oralResults || {},
+            oralSavedInputs: oaData.oralSavedInputs || {},
+            oralSavedScores: oaData.oralSavedScores || {},
+          };
+        }
+      }
+    }
+  } catch(e) {}
+
+  // 3. Fusionner avec ACTIVE_QUIZ_KEY (session quiz en cours)
+  try {
+    const aq = localStorage.getItem(ACTIVE_QUIZ_KEY);
+    if (aq) {
+      const aqData = JSON.parse(aq);
+      if (aqData && Array.isArray(aqData.questions) && aqData.questions.length > 0 && aqData.mode) {
+        const qs = aqData.questions.map(q => byId[q.id] || q).filter(Boolean);
+        if (qs.length > 0 && !pausedStates[aqData.mode]) {
+          pausedStates[aqData.mode] = {
+            questions: qs,
+            answers: aqData.answers || new Array(qs.length).fill(null),
+            quizResults: aqData.quizResults || new Array(qs.length).fill(null),
+            current: aqData.current || 0,
+            mode: aqData.mode,
+          };
+        }
+      }
+    }
+  } catch(e) {}
 }
 
 function clearPausedState(mode) {
@@ -4631,10 +4718,12 @@ updateHomeStats();
 function toggleQuizGraph(cb) {
   const g = document.getElementById('quiz-graph');
   if (g) g.classList.toggle('hidden', !cb.checked);
+  saveUIPrefs();
 }
 function toggleOralGraph(cb) {
   const g = document.getElementById('oral-graph');
   if (g) g.classList.toggle('hidden', !cb.checked);
+  saveUIPrefs();
 }
 function toggleMemo(el) {
   const isOpen = el.classList.contains('open');
